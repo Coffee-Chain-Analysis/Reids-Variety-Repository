@@ -54,3 +54,4 @@ temp %>%
   group_by(stock) %>%
   ggplot() +
   geom_line(mapping = aes(x = year, y = mean_close, color = stock))
+
