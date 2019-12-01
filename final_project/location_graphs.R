@@ -115,7 +115,3 @@ ggplot() +
   geom_point(data = dnkn_sbux %>%
                filter(state %nin% c("HI", "AK")), mapping = aes(x = longitude, y = latitude, color = store), alpha = 0.1)
 
-usMap <- us_map(regions = "states")
-
-View(usMap %>%
-       filter(y == min(usMap$y)))

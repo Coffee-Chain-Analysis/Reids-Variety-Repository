@@ -1,0 +1,276 @@
+---
+title: "partial_pdf"
+author: "me"
+date: "11/30/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(webshot)
+library(tidyverse)
+library(socviz)
+library(usmap)
+library(cowplot)
+library(maps)
+library(mapproj)
+library(RColorBrewer)
+library(lubridate)
+library(tinytex)
+library(knitr)
+webshot::install_phantomjs
+
+```
+
+```{r locations, message=FALSE, echo = FALSE}
+sbuxloc <- read_csv("data/sbuxlocations.csv")
+dnknloc <- read_csv("data/dnknlocations.csv", col_names = FALSE)
+
+dnknloc <- dnknloc %>%
+  rename(Longitude = X1,
+         Latitude = X2,
+         Specs = X3,
+         Location = X4)
+sbuxloc <- sbuxloc %>%
+  filter(Country %in% c("US"))
+
+dnknloc <- dnknloc %>%
+  mutate(store = "Dunkin")
+sbuxloc <- sbuxloc %>%
+  mutate(store = "Starbucks")
+
+dnknloc <- dnknloc %>%
+  separate(Specs, c("Specs", "State"), sep = ",")
+
+dnknloc <- dnknloc %>%
+  mutate(State = dnknloc %>%
+           pull(State) %>%
+           str_replace_all("\\ ", ""))
+
+dnkn_sbux <- tibble(
+  longitude = c(dnknloc %>%
+                  pull(Longitude), sbuxloc %>%
+                  pull(Longitude)),
+  latitude = c(dnknloc %>%
+                 pull(Latitude), sbuxloc %>%
+                 pull(Latitude)),
+  store = c(dnknloc %>%
+              pull(store), sbuxloc %>%
+              pull(store)),
+  state = c(dnknloc %>%
+              pull(State), sbuxloc %>%
+              pull(`State/Province`))
+)
+
+values <- tibble(
+  abbreviation = dnkn_sbux$state,
+  x = dnkn_sbux$longitude,
+  y = dnkn_sbux$latitude
+)
+
+scale_coord <- function(abbreviation, x, y) {
+  library(usmap)
+  values <- tibble(
+    abbreviation = abbreviation,
+    x = x,
+    y = y
+  )
+  usMap <- us_map(regions = "states")
+  scaler <- usMap %>%
+    group_by(abbr) %>%
+    summarize(max.x = max(x),
+              max.y = max(y),
+              min.x = min(x),
+              min.y = min(y))
+  scaler <- scaler %>%
+    mutate(variation.x = max.x - min.x,
+           variation.y = max.y - min.y)
+  base <- values %>%
+    group_by(abbreviation) %>%
+    summarize(max.x = max(x),
+              max.y = max(y),
+              min.x = min(x),
+              min.y = min(y))
+  base <- base %>%
+    mutate(variation.x = max.x - min.x,
+           variation.y = max.y - min.y)
+  longitude <- c()
+  latitude <- c()
+  indexes <- c()
+  count <- 1
+  for(state in values$abbreviation) {
+    for(abbrs in scaler$abbr) {
+      if(state == abbrs) {
+        indexes <- c(indexes, count)
+      }
+      count <- count + 1
+    }
+    count <- 1
+  }
+  count <- 1
+  for(index in indexes) {
+    longitude <- c(longitude, ((values$x[count]-base$min.x[index])/base$variation.x[index]) * scaler$variation.x[index] + scaler$min.x[index])
+    latitude <- c(latitude, ((values$y[count]-base$min.y[index])/base$variation.y[index]) * scaler$variation.y[index] + scaler$min.y[index])
+    count <- count + 1
+  }
+  return_tibble <- tibble(
+    state = values$abbreviation,
+    long = longitude,
+    lat = latitude
+  )
+  return(return_tibble)
+}
+
+modified_values <- scale_coord(dnkn_sbux$state, dnkn_sbux$longitude, dnkn_sbux$latitude) %>%
+  mutate(Store = dnkn_sbux$store)
+```
+Locations Graphs
+```{r graph_locations, message = FALSE}
+ggplot() +
+  geom_polygon(data = us_map(regions = "states"), mapping = aes(x = x, y = y, group = group), color = "gray", fill = "cornsilk") +
+  geom_point(data = modified_values, mapping = aes(x = long, y = lat, color = Store), alpha = 0.1) +
+  coord_equal() +
+  theme_map() +
+  scale_color_manual(values = c("blue", "orange")) +
+  labs(title = "Restuarant Locations in the US",
+       subtitle = "Dunkin' vs Starbucks") +
+  guides(color = guide_legend(title = "Brand")) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r density, message=FALSE, echo = FALSE}
+sq_mileage <- read_csv("data/mileage.csv")
+DNKN_loc <- read_csv("data/DunkinAvgLocations#2.csv")
+SBUX_loc <- read_csv("data/StarbuckAvgLocations#2.csv") %>%
+  rename(n = count)
+
+DNKN_loc <- DNKN_loc %>%
+  distinct(STATE, n) %>%
+  rename(state = STATE)
+SBUX_loc <- SBUX_loc %>%
+  distinct(STATE, n) %>%
+  rename(state = STATE)
+
+DNKN_loc <- left_join(us_map(region = "states") %>%
+                        rename(state = abbr), DNKN_loc, by = "state")
+SBUX_loc <- left_join(us_map(region = "states") %>%
+                        rename(state = abbr), SBUX_loc, by = "state")
+
+sq_mileage <- sq_mileage %>%
+  rename(full = state,
+         state_area = mileage)
+
+DNKN_loc <- left_join(DNKN_loc, sq_mileage, by = "full")
+SBUX_loc <- left_join(SBUX_loc, sq_mileage, by = "full")
+
+DNKN_loc <- DNKN_loc %>%
+  mutate(density = n/state_area)
+SBUX_loc <- SBUX_loc %>%
+  mutate(density = n/state_area)
+```
+Density with DC
+```{r DC_graphs, message = FALSE}
+DNKN_loc %>%
+  ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
+  geom_polygon() +
+  coord_equal() +
+  theme_map() +
+  scale_fill_distiller(palette = "Set1") +
+  labs(title = "Dunkin' Locations") +
+  theme(plot.title = element_text(hjust = 0.5))
+SBUX_loc %>%
+  ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
+  geom_polygon() +
+  coord_equal() +
+  theme_map() +
+  scale_fill_distiller(palette = "Set1") +
+  labs(title = "Starbucks Locations") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r filter_DC, message = FALSE, echo = FALSE}
+DNKN_loc <- DNKN_loc %>%
+  filter(state %nin% c("DC"))
+SBUX_loc <- SBUX_loc %>%
+  filter(state %nin% c("DC"))
+```
+Density without DC
+```{r dens_graphs, message = FALSE}
+DNKN_loc %>%
+  ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
+  geom_polygon() +
+  coord_equal() +
+  theme_map() +
+  scale_fill_distiller(palette = "Set1") +
+  labs(title = "Dunkin' Locations") +
+  theme(plot.title = element_text(hjust = 0.5))
+SBUX_loc %>%
+  ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
+  geom_polygon() +
+  coord_equal() +
+  theme_map() +
+  scale_fill_distiller(palette = "Set1") +
+  labs(title = "Starbucks Locations") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r stock, message = FALSE, echo = FALSE}
+
+DNKN <- read_csv("data/modified_DNKN.csv")
+SBUX <- read_csv("data/modified_SBUX.csv")
+
+DNKN <- DNKN %>%
+  mutate(stock = "DNKN")
+SBUX <- SBUX %>%
+  mutate(stock = "SBUX")
+
+D_S <- tibble(
+  timestamp = c(DNKN %>%
+                  pull(timestamp),
+                SBUX %>%
+                  pull(timestamp)),
+  stock = c(DNKN %>%
+              pull(stock),
+            SBUX %>%
+              pull(stock)),
+  close = c(DNKN %>%
+              pull(close),
+            SBUX %>%
+              pull(close))
+)
+```
+Monthly Stock Close
+```{r monthly_stock, message = FALSE}
+D_S %>%
+  group_by(stock) %>%
+  ggplot() +
+  geom_line(mapping = aes(x = timestamp, y = close, color = stock)) +
+  scale_color_manual(values = c("red", "green")) +
+  labs(title = "Monthly Close Values",
+       x = "Year",
+       y = "Close Value") +
+  guides(color = guide_legend(title = "Stock Symbols")) +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r mutate_DS, message = FALSE, echo = FALSE}
+temp <- D_S %>%
+  mutate(year = year(timestamp)) %>%
+  group_by(year, stock) %>%
+  summarize(mean_close = mean(close))
+```
+Yearly Mean Stock Close
+```{r yearly_mean, message = FALSE}
+temp %>%
+  group_by(stock) %>%
+  ggplot() +
+  geom_line(mapping = aes(x = year, y = mean_close, color = stock)) +
+  scale_color_manual(values = c("red", "green")) +
+  labs(title = "Average Monthly Close Value by Year",
+       x = "Year",
+       y = "Mean Close Value") +
+  guides(color = guide_legend(title = "Stock Symbols")) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
