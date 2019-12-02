@@ -1,0 +1,640 @@
+---
+title: "partial_pdf"
+author: "me"
+date: "11/30/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(webshot)
+library(tidyverse)
+library(socviz)
+library(usmap)
+library(cowplot)
+library(maps)
+library(mapproj)
+library(RColorBrewer)
+library(lubridate)
+library(tinytex)
+library(knitr)
+library(htmltools)
+library(leaflet)
+library(zoo)
+webshot::install_phantomjs
+
+```
+
+```{r locations, message=FALSE, echo = FALSE}
+sbuxloc <- read_csv("data/sbuxlocations.csv")
+dnknloc <- read_csv("data/dnknlocations.csv", col_names = FALSE)
+
+dnknloc <- dnknloc %>%
+  rename(Longitude = X1,
+         Latitude = X2,
+         Specs = X3,
+         Location = X4)
+sbuxloc <- sbuxloc %>%
+  filter(Country %in% c("US"))
+
+dnknloc <- dnknloc %>%
+  mutate(store = "Dunkin")
+sbuxloc <- sbuxloc %>%
+  mutate(store = "Starbucks")
+
+dnknloc <- dnknloc %>%
+  separate(Specs, c("Specs", "State"), sep = ",")
+
+dnknloc <- dnknloc %>%
+  mutate(State = dnknloc %>%
+           pull(State) %>%
+           str_replace_all("\\ ", ""))
+
+dnknLabel <- sprintf("<b>Dunkin'</b><br>%s", dnknloc$State) %>%
+  lapply(htmltools::HTML)
+sbuxLabel <- sprintf("<b>Starbucks</b><br>%s", sbuxloc$`State/Province`) %>%
+  lapply(htmltools::HTML)
+```
+Dunkin' Leaflet
+```{r leaflet_maps_dnkn, message = FALSE}
+dnknloc %>%
+  leaflet(width = "100%", options = leafletOptions(zoomSnap = 0.1)) %>%
+  setView(lng = -100, lat = 40, zoom = 3) %>%
+  addTiles() %>%
+  addMarkers(~Longitude, ~Latitude, popup = dnknLabel, label = dnknLabel)
+```
+Starbucks Leaflet
+```{r leaflet_maps_sbux, message = FALSE}
+sbuxloc %>%
+  leaflet(width = "100%", options = leafletOptions(zoomSnap = 0.1)) %>%
+  setView(lng = -100, lat = 40, zoom = 3) %>%
+  addTiles() %>%
+  addMarkers(~Longitude, ~Latitude, popup = sbuxLabel, label = sbuxLabel)
+```
+
+```{r dnkn_sbux, message = FALSE, echo = FALSE}
+dnkn_sbux <- tibble(
+  longitude = c(dnknloc %>%
+                  pull(Longitude), sbuxloc %>%
+                  pull(Longitude)),
+  latitude = c(dnknloc %>%
+                 pull(Latitude), sbuxloc %>%
+                 pull(Latitude)),
+  store = c(dnknloc %>%
+              pull(store), sbuxloc %>%
+              pull(store)),
+  state = c(dnknloc %>%
+              pull(State), sbuxloc %>%
+              pull(`State/Province`))
+)
+
+scale_coord <- function(abbreviation, x, y) {
+  library(usmap)
+  values <- tibble(
+    abbreviation = abbreviation,
+    x = x,
+    y = y
+  )
+  usMap <- us_map(regions = "states")
+  scaler <- usMap %>%
+    group_by(abbr) %>%
+    summarize(max.x = max(x),
+              max.y = max(y),
+              min.x = min(x),
+              min.y = min(y))
+  scaler <- scaler %>%
+    mutate(variation.x = max.x - min.x,
+           variation.y = max.y - min.y)
+  base <- values %>%
+    group_by(abbreviation) %>%
+    summarize(max.x = max(x),
+              max.y = max(y),
+              min.x = min(x),
+              min.y = min(y))
+  base <- base %>%
+    mutate(variation.x = max.x - min.x,
+           variation.y = max.y - min.y)
+  longitude <- c()
+  latitude <- c()
+  indexes <- c()
+  count <- 1
+  for(state in values$abbreviation) {
+    for(abbrs in scaler$abbr) {
+      if(state == abbrs) {
+        indexes <- c(indexes, count)
+      }
+      count <- count + 1
+    }
+    count <- 1
+  }
+  count <- 1
+  for(index in indexes) {
+    longitude <- c(longitude, ((values$x[count]-base$min.x[index])/base$variation.x[index]) * scaler$variation.x[index] + scaler$min.x[index])
+    latitude <- c(latitude, ((values$y[count]-base$min.y[index])/base$variation.y[index]) * scaler$variation.y[index] + scaler$min.y[index])
+    count <- count + 1
+  }
+  return_tibble <- tibble(
+    state = values$abbreviation,
+    long = longitude,
+    lat = latitude
+  )
+  return(return_tibble)
+}
+
+modified_values <- scale_coord(dnkn_sbux$state, dnkn_sbux$longitude, dnkn_sbux$latitude) %>%
+  mutate(Store = dnkn_sbux$store)
+```
+Locations Graphs
+```{r graph_locations, message = FALSE}
+ggplot() +
+  geom_polygon(data = us_map(regions = "states"), mapping = aes(x = x, y = y, group = group), color = "gray", fill = "cornsilk") +
+  geom_point(data = modified_values, mapping = aes(x = long, y = lat, color = Store), alpha = 0.1) +
+  coord_equal() +
+  theme_map() +
+  scale_color_manual(values = c("blue", "orange")) +
+  labs(title = "Restuarant Locations in the US",
+       subtitle = "Dunkin' vs Starbucks") +
+  guides(color = guide_legend(title = "Brand")) +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+```
+
+```{r store_per_state_starbucks, message = FALSE, echo = FALSE} 
+#gather data from csv files
+starbuck_local<- read_csv("data/directory.csv")
+starbuck_zip<-read_csv("data/ZIP-COUNTY-FIPS-2018.csv")
+
+#getting states dataset
+us_states<-map_data("state")
+
+#chaging dataset zip to numeric
+starbuck_zip<-starbuck_zip %>% 
+  mutate(ZIP=as.numeric(ZIP)) %>% 
+  distinct(CITY, .keep_all = TRUE)
+
+#filtering by country and renaming
+starbuck_local <- starbuck_local %>% 
+  filter(Country == "US") %>% 
+  rename(
+    CITY = City,
+    STATE = `State/Province`
+  )
+
+#joining datasets by city
+data<-left_join(starbuck_local,starbuck_zip,by=c("CITY","STATE"))
+
+#grouping by state and removing na values
+data<- data %>% 
+  group_by(STATE) %>% 
+  count() %>%
+  na.omit() 
+
+#renaming states to match join function
+us_states<-us_map("states") %>% 
+  rename(STATE=abbr)
+
+#left joining and renaming variables
+data<-left_join(us_states,data,by='STATE') %>% 
+  rename(count = n)
+
+temp_data <- data %>% 
+  select(STATE, count) %>% 
+  group_by(STATE) %>% 
+  summarise(count = mean(count))
+
+coord <- us_states %>% 
+  select(x, y, STATE) %>% 
+  group_by(STATE) %>% 
+  summarise(
+    x_avg = mean(x),
+    y_avg = mean(y))
+
+new_data <- merge(temp_data, coord, by = "STATE" )
+
+final_data <- merge(new_data, us_states, by = "STATE" )
+
+#plot data for locations
+centroid <- aggregate(data=final_data, cbind(x_avg, y_avg) ~ count + group, FUN=mean) 
+data %>% 
+  ggplot() +
+  geom_polygon(mapping = aes(x=x,y=y,group=group,fill=count), color = "lightgray", size = 0.5) +
+  coord_equal()+
+  theme_map()+
+  theme(panel.background = element_blank()) + ggtitle("US Starbuck's Location", subtitle = "Average # of Stores") + labs(fill = "Count")+
+  theme(legend.position="bottom", plot.title = element_text(hjust = 0.5),plot.subtitle =  element_text(hjust = 0.5)) +geom_text(data = centroid, mapping = aes(x_avg,y_avg, group = group, label = count), color = "black", inherit.aes = FALSE)+ scale_fill_gradient(low = "orange", high = "purple", guide = guide_legend())
+
+```
+
+```{r store_per_state_dunkin, message = FALSE, echo = FALSE}
+df<- read_csv("data/DD-US.csv",col_names = FALSE)
+zip<-read_csv("data/ZIP-COUNTY-FIPS-2018.csv")
+county_map <- county_map
+us_states<-map_data("state")
+
+zip<-zip %>% 
+  mutate(ZIP=as.numeric(ZIP))
+  
+df <- df %>%
+  mutate(ZIP = sapply(strsplit(df$X4, split='|', fixed=TRUE), function(x) (x[2]))) 
+
+df <- df %>%
+  mutate(DATA = sapply(strsplit(df$ZIP, split=c(','), fixed=TRUE), function(x) (x[2]))) 
+
+df <- df %>%
+  mutate(ZIP = sapply(strsplit(df$DATA, split=c(' '), fixed=TRUE), function(x) (x[2]))) 
+
+
+df<-df %>% 
+  mutate(ZIP=as.numeric(ZIP))
+
+data<-left_join(df,zip, by=c("ZIP")) %>% 
+  group_by(STATE) %>%
+  count() %>%
+  na.omit()
+
+us_states<-us_map("states") %>% 
+  rename(STATE=abbr)
+
+data<-left_join(us_states,data,by='STATE')
+
+
+temp_data <- data %>% 
+  select(STATE, n) %>% 
+  group_by(STATE) %>% 
+  summarise(n = mean(n))
+
+coord <- us_states %>% 
+  select(x, y, STATE) %>% 
+  group_by(STATE) %>% 
+  summarise(
+    x_avg = mean(x),
+    y_avg = mean(y))
+
+new_data <- merge(temp_data, coord, by = "STATE" )
+
+final_data <- merge(new_data, us_states, by = "STATE" )
+
+#plot data for locations
+centroid <- aggregate(data=final_data, cbind(x_avg, y_avg) ~ n + group, FUN=mean) 
+
+data%>% 
+  ggplot() +
+  geom_polygon(mapping = aes(x=x,y=y,group=group,fill=n),color = "lightgray", size = 0.5) +
+  coord_equal()+
+  theme_map()+
+  theme(panel.background = element_blank()) + ggtitle("US Dunkin' Donut's Location", subtitle = "Average # of Stores") + labs(fill = "Average") + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5),plot.subtitle =  element_text(hjust = 0.5))+
+  scale_fill_gradient(low = "orange", high = "purple", guide = guide_legend()) + geom_text(data = centroid, mapping = aes(x_avg,y_avg, group = group, label = n), color = "black", inherit.aes = FALSE)
+
+#---------------------------------------------------------------------------------------------------------------------------
+# by county
+
+df<- read_csv("data/DD-US.csv",col_names = FALSE)
+zip<-read_csv("data/ZIP-COUNTY-FIPS-2018.csv")
+
+cmap<-county_map
+us_states<-map_data("state")
+
+zip<-zip %>% 
+  mutate(ZIP=as.numeric(ZIP))
+
+df<-df %>% 
+  mutate(ZIP=as.numeric(str_match(X4,"(\\d{5})")[1]))
+
+data<-left_join(zip,df,by="ZIP") %>% 
+  mutate(COUNTYNAME=str_remove(COUNTYNAME," County")) %>% 
+  rename(county=COUNTYNAME) %>% 
+  mutate(county=tolower(county)) %>% 
+  group_by(county, STATE) %>% 
+  count() %>% 
+  na.omit() 
+
+data <- data %>% 
+  summarise(s= max(n)) %>% 
+  arrange(desc(s)) %>% 
+  na.omit() 
+
+r <- us_map(regions = "counties")
+
+r <- r %>% 
+  rename(
+    STATE = abbr
+  )
+r <-  r %>% 
+  mutate(county = str_remove(county, " County"))
+
+r <- r %>% 
+  mutate(county = tolower(county))
+
+r <- r %>% 
+  group_by(STATE, county) 
+ 
+data<-left_join(r,data, by = c("STATE","county"))
+
+new_data <- data %>% 
+  select(STATE, county, s) %>% 
+  group_by(STATE,county) %>% 
+  summarise(count= max(s)) %>% 
+  arrange(desc(count)) %>% 
+  na.omit() %>% 
+  head(20) 
+```
+
+```{r density, message=FALSE, echo = FALSE}
+sq_mileage <- read_csv("data/mileage.csv")
+DNKN_loc <- read_csv("data/DunkinAvgLocations#2.csv")
+SBUX_loc <- read_csv("data/StarbuckAvgLocations#2.csv") %>%
+  rename(n = count)
+
+DNKN_loc <- DNKN_loc %>%
+  distinct(STATE, n) %>%
+  rename(state = STATE)
+SBUX_loc <- SBUX_loc %>%
+  distinct(STATE, n) %>%
+  rename(state = STATE)
+
+DNKN_loc <- left_join(us_map(region = "states") %>%
+                        rename(state = abbr), DNKN_loc, by = "state")
+SBUX_loc <- left_join(us_map(region = "states") %>%
+                        rename(state = abbr), SBUX_loc, by = "state")
+
+sq_mileage <- sq_mileage %>%
+  rename(full = state,
+         state_area = mileage)
+
+DNKN_loc <- left_join(DNKN_loc, sq_mileage, by = "full")
+SBUX_loc <- left_join(SBUX_loc, sq_mileage, by = "full")
+
+DNKN_loc <- DNKN_loc %>%
+  mutate(density = n/state_area)
+SBUX_loc <- SBUX_loc %>%
+  mutate(density = n/state_area)
+```
+Density with DC
+```{r DC_graphs, message = FALSE}
+DNKN_loc %>%
+  ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
+  geom_polygon() +
+  coord_equal() +
+  theme_map() +
+  scale_fill_distiller(palette = "Set1") +
+  labs(title = "Dunkin' Locations") +
+  theme(plot.title = element_text(hjust = 0.5))
+SBUX_loc %>%
+  ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
+  geom_polygon() +
+  coord_equal() +
+  theme_map() +
+  scale_fill_distiller(palette = "Set1") +
+  labs(title = "Starbucks Locations") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r filter_DC, message = FALSE, echo = FALSE}
+DNKN_loc <- DNKN_loc %>%
+  filter(state %nin% c("DC"))
+SBUX_loc <- SBUX_loc %>%
+  filter(state %nin% c("DC"))
+```
+Density without DC
+```{r dens_graphs, message = FALSE}
+DNKN_loc %>%
+  ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
+  geom_polygon() +
+  coord_equal() +
+  theme_map() +
+  scale_fill_distiller(palette = "Set1") +
+  labs(title = "Dunkin' Locations") +
+  theme(plot.title = element_text(hjust = 0.5))
+SBUX_loc %>%
+  ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
+  geom_polygon() +
+  coord_equal() +
+  theme_map() +
+  scale_fill_distiller(palette = "Set1") +
+  labs(title = "Starbucks Locations") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r stock, message = FALSE, echo = FALSE}
+
+DNKN <- read_csv("data/modified_DNKN.csv")
+SBUX <- read_csv("data/modified_SBUX.csv")
+
+DNKN <- DNKN %>%
+  mutate(stock = "DNKN")
+SBUX <- SBUX %>%
+  mutate(stock = "SBUX")
+
+D_S <- tibble(
+  timestamp = c(DNKN %>%
+                  pull(timestamp),
+                SBUX %>%
+                  pull(timestamp)),
+  stock = c(DNKN %>%
+              pull(stock),
+            SBUX %>%
+              pull(stock)),
+  close = c(DNKN %>%
+              pull(close),
+            SBUX %>%
+              pull(close))
+)
+```
+Monthly Stock Close
+```{r monthly_stock, message = FALSE}
+D_S %>%
+  group_by(stock) %>%
+  ggplot() +
+  geom_line(mapping = aes(x = timestamp, y = close, color = stock)) +
+  scale_color_manual(values = c("red", "green")) +
+  geom_smooth(mapping = aes(timestamp,close,color=stock),method = "lm") +
+  labs(title = "Monthly Close Values",
+       x = "Year",
+       y = "Close Value") +
+  guides(color = guide_legend(title = "Stock Symbols")) +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+Prediction graph
+```{r error, message = FALSE}
+sim1_mod <- lm(close ~ timestamp, data = filter(D_S,stock=="DNKN"))
+coef(sim1_mod)
+
+sim1_mod <- lm(close ~ timestamp, data = filter(D_S,stock=="SBUX"))
+coef(sim1_mod)
+```
+
+```{r mutate_DS, message = FALSE, echo = FALSE}
+yrly <- D_S %>%
+  mutate(year = year(timestamp)) %>%
+  group_by(year, stock) %>%
+  summarize(mean_close = mean(close))
+```
+Yearly Mean Stock Close
+```{r yearly_mean, message = FALSE}
+yrly %>%
+  group_by(stock) %>%
+  ggplot() +
+  geom_line(mapping = aes(x = year, y = mean_close, color = stock)) +
+  scale_color_manual(values = c("red", "green")) +
+  labs(title = "Average Monthly Close Value by Year",
+       x = "Year",
+       y = "Mean Close Value") +
+  guides(color = guide_legend(title = "Stock Symbols")) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r revenue_starbucks, message = FALSE, echo = FALSE, warning = FALSE}
+#Revenue of company stores
+starbuck_rev<- read_csv("data/starbucks.csv")
+
+starbuck_rev <- starbuck_rev %>% 
+  select(year, Company_Operated_Stores:Total_OS)
+
+starbuck_rev <- starbuck_rev %>% 
+  select(Company_Operated_Stores, License_Stores, Other, Total,year) %>% 
+  gather(Type, count, Company_Operated_Stores, License_Stores, Other, Total) %>% 
+  na.omit()
+
+starbuck_rev <- starbuck_rev %>% 
+  group_by(Type, year) %>% 
+  summarise(mean = mean(count))
+# starbuck_rev %>% 
+#   ggplot() + 
+#   geom_col(mapping = aes(reorder(year, mean),
+#                          y = mean, fill=Type)) + labs(title = "Starbuck's Revenue")+
+#   theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Revenue")  +  facet_wrap(~Type, nrow = 3, scales = "free") + coord_flip()
+
+starbuck_rev %>%
+group_by(Type) %>%
+  ggplot(mapping = aes(x = year, y = mean)) +
+  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free") + labs(title = "Starbuck's Revenue")+ theme(plot.title = element_text(hjust = 0.5))
+
+#revenue by country
+starbuck_rev<- read_csv("data/starbucks.csv")
+
+starbuck_rev <- starbuck_rev %>% 
+  select(year, Company_Operated_Stores:Total_OS)
+
+starbuck_rev <- starbuck_rev %>% 
+  select(Americas_Licensed, EMEA_Licensed, CP_Licensed, Total_LS, year) %>% 
+  gather(Type, count, Americas_Licensed, EMEA_Licensed, CP_Licensed, Total_LS) %>% 
+  na.omit()
+
+starbuck_rev <- starbuck_rev %>% 
+  group_by(Type, year) %>% 
+  summarise(mean = mean(count))
+# starbuck_rev %>% 
+#   ggplot() + 
+#   geom_col(mapping = aes(reorder(year, mean),
+#                          y = mean, fill=Type)) + labs(title = "Starbuck's Revenue/Country(LS)")+
+#   theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Revenue") + scale_fill_brewer(palette = "Set2")  +  facet_wrap(~Type, nrow = 3, scales = "free") + coord_flip()
+#   scale_y_continuous(limits = c(0, 20000))
+
+starbuck_rev %>%
+  group_by(Type) %>%
+  ggplot(mapping = aes(x = year, y = mean)) +
+  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free")+ labs(title = "Starbuck's Revenue")+ labs(title = "Starbuck's Revenue/Country(LS)")+
+theme(plot.title = element_text(hjust = 0.5))
+
+
+#revenue by country(com)
+
+starbuck_rev<- read_csv("data/starbucks.csv")
+
+starbuck_rev <- starbuck_rev %>% 
+  select(year, Company_Operated_Stores:Total_OS)
+
+starbuck_rev <- starbuck_rev %>% 
+  select(Americas_Com, EMEA_Com, CP_Com, Total_OS, year) %>% 
+  gather(Type, count, Americas_Com, EMEA_Com, CP_Com, Total_OS) %>% 
+  na.omit()
+
+starbuck_rev <- starbuck_rev %>% 
+  group_by(Type, year) %>% 
+  summarise(mean = mean(count))
+
+# starbuck_rev %>% 
+#   ggplot() + 
+#   geom_col(mapping = aes(reorder(year, mean),
+#                          y = mean, fill=Type)) + labs(title = "Starbuck's Reveue/Country(OS)")+
+#   theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Revenue") + scale_fill_brewer(palette = "Set2")  +  facet_wrap(~Type, nrow = 3, scales = "free") + coord_flip()
+
+starbuck_rev %>%
+  group_by(Type) %>%
+  ggplot(mapping = aes(x = year, y = mean, )) +
+  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free") + labs(title = "Starbuck's Reveue/Country(OS)") + theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r revenue_dunkin, message = FALSE, echo = FALSE, warning = FALSE}
+dunk_rev<- read_csv("data/dunkin.csv")
+
+dunk_rev <- dunk_rev %>% 
+  select(year_of_publish, DD_US_F:BR_US_C, Franchise_income, Rental_income:Total_reveneu)
+
+dunk_rev <- dunk_rev %>% 
+  rename(
+    `Dunkin US Franchise` = DD_US_F,
+    `Dunkin International Franchise` = DD_IN_F,
+    `Baskin Robin US Franchise` = BR_US_F,
+    `Baskin Robin International Franchise` = BR_IN_F,
+    `Baskin Robin US Company` = BR_US_C,
+    `Dunkin US Company` = DD_US_C
+  )
+dunk_rev <- dunk_rev %>% 
+  select(`Dunkin US Franchise`, `Dunkin International Franchise`, `Baskin Robin US Franchise`,  `Baskin Robin International Franchise`,`Baskin Robin US Company`,`Dunkin US Company`, year_of_publish) %>% 
+  gather(Type, count,`Dunkin US Franchise`, `Dunkin International Franchise` , `Baskin Robin US Franchise` ,`Baskin Robin International Franchise`,`Baskin Robin US Company`,`Dunkin US Company`) %>% 
+  na.omit()
+
+
+
+dunk_rev <- dunk_rev%>% 
+  group_by(Type, year_of_publish) %>% 
+  summarise(mean = mean(count))
+
+dunk_rev %>% 
+    ggplot() +
+    geom_col(mapping = aes(reorder(year_of_publish, mean),
+                           y = mean, fill=Type)) +
+    theme(plot.title = element_text(hjust = 0.5)) + ylab("Store Count") + xlab("Year")+ labs(title = "Dunkin Donut's Store Count")+ facet_wrap(~Type, scales = "free")
+
+# dunk_rev %>%
+#   group_by(Type) %>% 
+#   ggplot(mapping = aes(x = year_of_publish, y = mean)) +
+#   geom_line(mapping = aes(color = Type)) + ylab("Store Count") + xlab("Year")+ facet_wrap(~Type, scales = "free")+ labs(title = "Dunkin Donut's Store Count")+ theme(plot.title = element_text(hjust = 0.5))
+
+
+#----------------------------------------------------------------------------
+dunk_rev<- read_csv("data/dunkin.csv")
+
+dunk_rev <- dunk_rev %>% 
+  select(year_of_publish, DD_US_F:BR_IN_F, Franchise_income, Rental_income:Total_reveneu)
+
+dunk_rev <- dunk_rev %>% 
+  rename(
+    `Franchise Income` = Franchise_income,
+    `Rental Income` = Rental_income,
+    `Sales of Company Restaruant` = `Sales_of_company restaurant`,
+    `Sales of IceCream` = Sales_of_Icecream,
+    `Total Revenue` = Total_reveneu,
+    `Other Revenue` = Other_reveneue
+ 
+  )
+dunk_rev <- dunk_rev %>% 
+  select( `Franchise Income` , `Rental Income`, `Sales of Company Restaruant`, `Sales of IceCream`,`Total Revenue`, `Other Revenue`, year_of_publish) %>% 
+  gather(Type, count, `Franchise Income`, `Rental Income`, `Sales of Company Restaruant`, `Sales of IceCream`,`Total Revenue`,`Other Revenue`) %>% 
+  na.omit()
+
+
+dunk_rev <- dunk_rev%>% 
+  group_by(Type, year_of_publish) %>% 
+  summarise(mean = mean(count))
+
+dunk_rev %>%
+  group_by(Type) %>% 
+  ggplot(mapping = aes(x = year_of_publish, y = mean)) +
+  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, scales = "free")+ theme(plot.title = element_text(hjust = 0.5))+ labs(title = "Dunkin Donut's Revenue")
+
+```
