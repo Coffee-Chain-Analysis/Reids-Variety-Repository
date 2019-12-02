@@ -159,6 +159,72 @@ ggplot() +
 
 ```
 
+```{r store_per_state_starbucks, message = FALSE, echo = FALSE} 
+#gather data from csv files
+starbuck_local<- read_csv("data/directory.csv")
+starbuck_zip<-read_csv("data/ZIP-COUNTY-FIPS-2018.csv")
+
+#getting states dataset
+us_states<-map_data("state")
+
+#chaging dataset zip to numeric
+starbuck_zip<-starbuck_zip %>% 
+  mutate(ZIP=as.numeric(ZIP)) %>% 
+  distinct(CITY, .keep_all = TRUE)
+
+#filtering by country and renaming
+starbuck_local <- starbuck_local %>% 
+  filter(Country == "US") %>% 
+  rename(
+    CITY = City,
+    STATE = `State/Province`
+  )
+
+#joining datasets by city
+data<-left_join(starbuck_local,starbuck_zip,by=c("CITY","STATE"))
+
+#grouping by state and removing na values
+data<- data %>% 
+  group_by(STATE) %>% 
+  count() %>%
+  na.omit() 
+
+#renaming states to match join function
+us_states<-us_map("states") %>% 
+  rename(STATE=abbr)
+
+#left joining and renaming variables
+data<-left_join(us_states,data,by='STATE') %>% 
+  rename(count = n)
+
+temp_data <- data %>% 
+  select(STATE, count) %>% 
+  group_by(STATE) %>% 
+  summarise(count = mean(count))
+
+coord <- us_states %>% 
+  select(x, y, STATE) %>% 
+  group_by(STATE) %>% 
+  summarise(
+    x_avg = mean(x),
+    y_avg = mean(y))
+
+new_data <- merge(temp_data, coord, by = "STATE" )
+
+final_data <- merge(new_data, us_states, by = "STATE" )
+
+#plot data for locations
+centroid <- aggregate(data=final_data, cbind(x_avg, y_avg) ~ count + group, FUN=mean) 
+data %>% 
+  ggplot() +
+  geom_polygon(mapping = aes(x=x,y=y,group=group,fill=count), color = "lightgray", size = 0.5) +
+  coord_equal()+
+  theme_map()+
+  theme(panel.background = element_blank()) + ggtitle("US Starbuck's Location", subtitle = "Average # of Stores") + labs(fill = "Count")+
+  theme(legend.position="bottom", plot.title = element_text(hjust = 0.5),plot.subtitle =  element_text(hjust = 0.5)) +geom_text(data = centroid, mapping = aes(x_avg,y_avg, group = group, label = count), color = "black", inherit.aes = FALSE)+ scale_fill_gradient(low = "orange", high = "purple", guide = guide_legend())
+
+```
+
 ```{r density, message=FALSE, echo = FALSE}
 sq_mileage <- read_csv("data/mileage.csv")
 DNKN_loc <- read_csv("data/DunkinAvgLocations#2.csv")
@@ -351,4 +417,90 @@ growth %>%
   guides(color = guide_legend(title = "Stock Symbols")) +
   theme(plot.title = element_text(hjust = 0.5))
   
+```
+
+```{r revenue_starbucks, message = FALSE, echo = FALSE, warning = FALSE}
+#Revenue of company stores
+starbuck_rev<- read_csv("data/starbucks.csv")
+
+starbuck_rev <- starbuck_rev %>% 
+  select(year, Company_Operated_Stores:Total_OS)
+
+starbuck_rev <- starbuck_rev %>% 
+  select(Company_Operated_Stores, License_Stores, Other, Total,year) %>% 
+  gather(Type, count, Company_Operated_Stores, License_Stores, Other, Total) %>% 
+  na.omit()
+
+starbuck_rev <- starbuck_rev %>% 
+  group_by(Type, year) %>% 
+  summarise(mean = mean(count))
+# starbuck_rev %>% 
+#   ggplot() + 
+#   geom_col(mapping = aes(reorder(year, mean),
+#                          y = mean, fill=Type)) + labs(title = "Starbuck's Revenue")+
+#   theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Revenue")  +  facet_wrap(~Type, nrow = 3, scales = "free") + coord_flip()
+
+starbuck_rev %>%
+group_by(Type) %>%
+  ggplot(mapping = aes(x = year, y = mean)) +
+  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free") + labs(title = "Starbuck's Revenue")+ theme(plot.title = element_text(hjust = 0.5))
+
+write_csv(starbuck_rev, "data/TotalRevenue.csv")
+
+#revenue by country
+starbuck_rev<- read_csv("data/starbucks.csv")
+
+starbuck_rev <- starbuck_rev %>% 
+  select(year, Company_Operated_Stores:Total_OS)
+
+starbuck_rev <- starbuck_rev %>% 
+  select(Americas_Licensed, EMEA_Licensed, CP_Licensed, Total_LS, year) %>% 
+  gather(Type, count, Americas_Licensed, EMEA_Licensed, CP_Licensed, Total_LS) %>% 
+  na.omit()
+
+starbuck_rev <- starbuck_rev %>% 
+  group_by(Type, year) %>% 
+  summarise(mean = mean(count))
+# starbuck_rev %>% 
+#   ggplot() + 
+#   geom_col(mapping = aes(reorder(year, mean),
+#                          y = mean, fill=Type)) + labs(title = "Starbuck's Revenue/Country(LS)")+
+#   theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Revenue") + scale_fill_brewer(palette = "Set2")  +  facet_wrap(~Type, nrow = 3, scales = "free") + coord_flip()
+#   scale_y_continuous(limits = c(0, 20000))
+
+starbuck_rev %>%
+  group_by(Type) %>%
+  ggplot(mapping = aes(x = year, y = mean)) +
+  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free")+ labs(title = "Starbuck's Revenue")+ labs(title = "Starbuck's Revenue/Country(LS)")+
+theme(plot.title = element_text(hjust = 0.5))
+
+
+write_csv(starbuck_rev, "data/revenue(Ls).csv")
+#revenue by country(com)
+
+starbuck_rev<- read_csv("data/starbucks.csv")
+
+starbuck_rev <- starbuck_rev %>% 
+  select(year, Company_Operated_Stores:Total_OS)
+
+starbuck_rev <- starbuck_rev %>% 
+  select(Americas_Com, EMEA_Com, CP_Com, Total_OS, year) %>% 
+  gather(Type, count, Americas_Com, EMEA_Com, CP_Com, Total_OS) %>% 
+  na.omit()
+
+starbuck_rev <- starbuck_rev %>% 
+  group_by(Type, year) %>% 
+  summarise(mean = mean(count))
+
+# starbuck_rev %>% 
+#   ggplot() + 
+#   geom_col(mapping = aes(reorder(year, mean),
+#                          y = mean, fill=Type)) + labs(title = "Starbuck's Reveue/Country(OS)")+
+#   theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Revenue") + scale_fill_brewer(palette = "Set2")  +  facet_wrap(~Type, nrow = 3, scales = "free") + coord_flip()
+
+starbuck_rev %>%
+  group_by(Type) %>%
+  ggplot(mapping = aes(x = year, y = mean, )) +
+  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free") + labs(title = "Starbuck's Reveue/Country(OS)") + theme(plot.title = element_text(hjust = 0.5))
+
 ```
