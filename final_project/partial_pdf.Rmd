@@ -18,6 +18,8 @@ library(RColorBrewer)
 library(lubridate)
 library(tinytex)
 library(knitr)
+library(htmltools)
+library(leaflet)
 webshot::install_phantomjs
 
 ```
@@ -47,6 +49,29 @@ dnknloc <- dnknloc %>%
            pull(State) %>%
            str_replace_all("\\ ", ""))
 
+dnknLabel <- sprintf("<b>Dunkin'</b><br>%s", dnknloc$State) %>%
+  lapply(htmltools::HTML)
+sbuxLabel <- sprintf("<b>Starbucks</b><br>%s", sbuxloc$`State/Province`) %>%
+  lapply(htmltools::HTML)
+```
+Dunkin' Leaflet
+```{r leaflet_maps_dnkn, message = FALSE}
+dnknloc %>%
+  leaflet(width = "100%", options = leafletOptions(zoomSnap = 0.1)) %>%
+  setView(lng = -100, lat = 40, zoom = 3) %>%
+  addTiles() %>%
+  addMarkers(~Longitude, ~Latitude, popup = dnknLabel, label = dnknLabel)
+```
+Starbucks Leaflet
+```{r leaflet_maps_sbux, message = FALSE}
+sbuxloc %>%
+  leaflet(width = "100%", options = leafletOptions(zoomSnap = 0.1)) %>%
+  setView(lng = -100, lat = 40, zoom = 3) %>%
+  addTiles() %>%
+  addMarkers(~Longitude, ~Latitude, popup = sbuxLabel, label = sbuxLabel)
+```
+
+```{r dnkn_sbux, message = FALSE, echo = FALSE}
 dnkn_sbux <- tibble(
   longitude = c(dnknloc %>%
                   pull(Longitude), sbuxloc %>%
@@ -60,12 +85,6 @@ dnkn_sbux <- tibble(
   state = c(dnknloc %>%
               pull(State), sbuxloc %>%
               pull(`State/Province`))
-)
-
-values <- tibble(
-  abbreviation = dnkn_sbux$state,
-  x = dnkn_sbux$longitude,
-  y = dnkn_sbux$latitude
 )
 
 scale_coord <- function(abbreviation, x, y) {
@@ -135,7 +154,8 @@ ggplot() +
   labs(title = "Restuarant Locations in the US",
        subtitle = "Dunkin' vs Starbucks") +
   guides(color = guide_legend(title = "Brand")) +
-  theme(plot.title = element_text(hjust = 0.5))
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
 
 ```
 
@@ -255,14 +275,14 @@ D_S %>%
 ```
 
 ```{r mutate_DS, message = FALSE, echo = FALSE}
-temp <- D_S %>%
+yrly <- D_S %>%
   mutate(year = year(timestamp)) %>%
   group_by(year, stock) %>%
   summarize(mean_close = mean(close))
 ```
 Yearly Mean Stock Close
 ```{r yearly_mean, message = FALSE}
-temp %>%
+yrly %>%
   group_by(stock) %>%
   ggplot() +
   geom_line(mapping = aes(x = year, y = mean_close, color = stock)) +
@@ -273,4 +293,62 @@ temp %>%
   guides(color = guide_legend(title = "Stock Symbols")) +
   theme(plot.title = element_text(hjust = 0.5))
 
+```
+
+```{r growth, message = FALSE, echo = FALSE}
+growth_dnkn <- D_S %>%
+  arrange(desc(timestamp)) %>%
+  group_by(stock) %>%
+  filter(stock %in% c("DNKN"))
+growth_sbux <- D_S %>%
+  arrange(desc(timestamp)) %>%
+  group_by(stock) %>%
+  filter(stock %in% c("SBUX"))
+count <- 0
+g_d <- c()
+g_s <- c()
+for(x in growth_dnkn$close) {
+  if(count != 0) {
+    g_d <- c(g_d, x - growth_dnkn$close[count])
+  } else {
+    g_d <- c(g_d, 50000)
+  }
+  count <- count + 1
+}
+count <- 0
+for(x in growth_sbux$close) {
+  if(count != 0) {
+    g_s <- c(g_s, x - growth_dnkn$close[count])
+  } else {
+    g_s <- c(g_s, 50000)
+  }
+  count <- count + 1
+}
+growth_dnkn <- growth_dnkn %>%
+  mutate(change = g_d)
+growth_sbux <- growth_sbux %>%
+  mutate(change = g_s)
+
+growth <- tibble(
+  timestamp = c(growth_dnkn$timestamp, growth_sbux$timestamp),
+  stock = c(growth_dnkn$stock, growth_sbux$stock),
+  change = c(growth_dnkn$change, growth_sbux$change)
+)
+
+growth <- growth %>%
+  filter(change %nin% c(50000))
+```
+Growth Plots
+```{r growth_plot, message = FALSE}
+growth %>%
+  group_by(stock) %>%
+  ggplot() +
+  geom_line(mapping = aes(x = timestamp, y = change, color = stock)) +
+  scale_color_manual(values = c("red", "green")) +
+  labs(title = "Growth of Stocks",
+       x = "Year",
+       y = "Change") +
+  guides(color = guide_legend(title = "Stock Symbols")) +
+  theme(plot.title = element_text(hjust = 0.5))
+  
 ```
