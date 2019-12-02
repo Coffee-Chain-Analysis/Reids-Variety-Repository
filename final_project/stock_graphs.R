@@ -1,5 +1,6 @@
 library(tidyverse)
 library(lubridate)
+library(zoo)
 
 # DNKN <- read_csv("data/monthly_DNKN.csv")
 # SBUX <- read_csv("data/monthly_SBUX.csv")
@@ -43,7 +44,17 @@ D_S <- tibble(
 D_S %>%
   group_by(stock) %>%
   ggplot() +
-  geom_line(mapping = aes(x = timestamp, y = close, color = stock))
+  geom_line(mapping = aes(x = timestamp, y = close, color = stock))+
+  geom_smooth(mapping = aes(timestamp,close,color=stock),method = "lm")
+
+
+sim1_mod <- lm(close ~ timestamp, data = filter(D_S,stock=="DNKN"))
+coef(sim1_mod)
+
+sim1_mod <- lm(close ~ timestamp, data = filter(D_S,stock=="SBUX"))
+coef(sim1_mod)
+
+
 
 temp <- D_S %>%
   mutate(year = year(timestamp)) %>%
