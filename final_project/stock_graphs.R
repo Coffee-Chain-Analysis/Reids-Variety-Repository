@@ -66,9 +66,9 @@ Starbucks_monthly_average_growth_rate<-(-atan(Starbucks_intercepts[1]/Starbucks_
 Dunkin_intercepts<-lm(DNKN$close~DNKN$timestamp)[1]$coefficient
 Dunkin_monthly_average_growth_rate<-(-atan(Dunkin_intercepts[1]/Dunkin_intercepts[2]))
 
-
-lm(DNKN$close~DNKN$timestamp) %>% 
-  Coefficients
+# 
+# lm(DNKN$close~DNKN$timestamp) %>% 
+#   Coefficients
 
 # 
 # sim1_mod <- lm(close ~ timestamp, data = filter(D_S,stock=="DNKN"))
