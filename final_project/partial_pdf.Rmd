@@ -353,12 +353,12 @@ df<-df %>%
 df<- df %>% 
   mutate(STATE=sapply(strsplit(df$data, split=' ', fixed=TRUE), function(x) (x[1])),ZIP=as.numeric(sapply(strsplit(df$data, split=' ', fixed=TRUE), function(x) (x[2]))))
 
-#PROBLEM
-
-# data<-left_join(df,zip, by=c("ZIP")) %>%
-#   group_by(STATE) %>%
-#   count() %>%
-#   na.omit()
+data<-left_join(df,zip, by=c("ZIP")) %>%
+  select(-STATE.x) %>%
+  rename(STATE = STATE.y) %>%
+  group_by(STATE) %>%
+  count() %>%
+  na.omit()
 
 us_states<-us_map("states") %>% 
   rename(STATE=abbr)
@@ -397,16 +397,21 @@ data%>%
 
 ```{r density, message=FALSE}
 sq_mileage <- read_csv("data/mileage.csv")
-DNKN_loc <- read_csv("data/DunkinAvgLocations#2.csv")
-SBUX_loc <- read_csv("data/StarbuckAvgLocations#2.csv") %>%
-  rename(n = count)
+DNKN_loc <- read_csv("data/DD-US.csv", col_names = FALSE)
+SBUX_loc <- read_csv("data/directory.csv")
 
-DNKN_loc <- DNKN_loc %>%
-  distinct(STATE, n) %>%
-  rename(state = STATE)
 SBUX_loc <- SBUX_loc %>%
-  distinct(STATE, n) %>%
-  rename(state = STATE)
+  filter(Country %in% c("US")) %>%
+  rename(state = `State/Province`) %>%
+  count(state)
+DNKN_loc <- DNKN_loc %>%
+  rename(specs = X3) %>%
+  separate(specs, c("specs", "state"), sep = ",")
+DNKN_loc <- DNKN_loc %>%
+  mutate(state = DNKN_loc %>%
+           pull(state) %>%
+           str_replace_all("// ", "")) %>%
+  count(state)
 
 DNKN_loc <- left_join(us_map(region = "states") %>%
                         rename(state = abbr), DNKN_loc, by = "state")
