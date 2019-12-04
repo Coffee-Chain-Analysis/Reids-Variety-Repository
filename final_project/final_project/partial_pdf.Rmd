@@ -55,7 +55,7 @@ dnknLabel <- sprintf("<b>Dunkin'</b><br>%s", dnknloc$State) %>%
 sbuxLabel <- sprintf("<b>Starbucks</b><br>%s", sbuxloc$`State/Province`) %>%
   lapply(htmltools::HTML)
 ```
-Dunkin' Leaflet
+### Dunkin' Leaflet
 ```{r leaflet_maps_dnkn, message = FALSE}
 dnknloc %>%
   leaflet(width = "100%", options = leafletOptions(zoomSnap = 0.1)) %>%

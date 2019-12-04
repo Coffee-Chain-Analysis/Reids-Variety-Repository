@@ -3,10 +3,11 @@ title: "Group 4 Writeup"
 author: "Reid Jumper, Harsh Nagarkar, and Micheal Davis"
 date: "12/4/2019"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
 ---
-###Analysis of Public Coffee Chains
+## Analysis of Public Coffee Chains
 ```{r setup}
 knitr::opts_chunk$set(echo = TRUE)
 library(webshot)
@@ -26,11 +27,13 @@ library(zoo)
 #webshot::install_phantomjs
 
 ```
-###Where are the companies, Dunkin' Donuts and Starbucks, competing?
+## Where are the companies, Dunkin' Donuts and Starbucks, competing?
 ```{r locations, message=FALSE}
 sbuxloc <- read_csv("data/sbuxlocations.csv")
 dnknloc <- read_csv("data/dnknlocations.csv", col_names = FALSE)
+```
 
+```{r locations_2, message=FALSE}
 dnknloc <- dnknloc %>%
   rename(Longitude = X1,
          Latitude = X2,
@@ -57,9 +60,9 @@ dnknLabel <- sprintf("<b>Dunkin'</b><br>%s", dnknloc$State) %>%
 sbuxLabel <- sprintf("<b>Starbucks</b><br>%s", sbuxloc$`State/Province`) %>%
   lapply(htmltools::HTML)
 ```
-First, it is important to look at where these restaurants are located in the US.
 
-#Dunkin' Leaflet
+First, it is important to look at where these restaurants are located in the US.
+# Dunkin' Leaflet
 ```{r leaflet_maps_dnkn, message = FALSE}
 dnknloc %>%
   leaflet(width = "100%", options = leafletOptions(zoomSnap = 0.1)) %>%
@@ -67,7 +70,11 @@ dnknloc %>%
   addTiles() %>%
   addMarkers(~Longitude, ~Latitude, popup = dnknLabel, label = dnknLabel)
 ```
-#Starbucks Leaflet
+
+
+
+
+# Starbucks Leaflet
 ```{r leaflet_maps_sbux, message = FALSE}
 sbuxloc %>%
   leaflet(width = "100%", options = leafletOptions(zoomSnap = 0.1)) %>%
@@ -76,7 +83,7 @@ sbuxloc %>%
   addMarkers(~Longitude, ~Latitude, popup = sbuxLabel, label = sbuxLabel)
 ```
 
-```{r dnkn_sbux, message = FALSE}
+```{r dnkn_sbux, echo = FALSE, message = FALSE}
 dnkn_sbux <- tibble(
   longitude = c(dnknloc %>%
                   pull(Longitude), sbuxloc %>%
@@ -144,7 +151,14 @@ scale_coord <- function(abbreviation, x, y) {
 modified_values <- scale_coord(dnkn_sbux$state, dnkn_sbux$longitude, dnkn_sbux$latitude) %>%
   mutate(Store = dnkn_sbux$store)
 ```
-#Locations Graphs
+
+
+
+
+
+
+
+# Locations Graphs
 ```{r graph_locations, message = FALSE}
 ggplot() +
   geom_polygon(data = us_map(regions = "states"), mapping = aes(x = x, y = y, group = group), color = "gray", fill = "cornsilk") +
@@ -159,7 +173,15 @@ ggplot() +
         plot.subtitle = element_text(hjust = 0.5))
 
 ```
-##Which states have the highest number of stores for Dunkin Donuts and Starbucks?
+
+
+
+
+
+
+
+
+## Which states have the highest number of stores for Dunkin Donuts and Starbucks?
 ```{r store_per_state_starbucks, message = FALSE} 
 #gather data from csv files
 starbuck_local<- read_csv("data/directory.csv")
@@ -198,6 +220,8 @@ us_states<-us_map("states") %>%
 data<-left_join(us_states,data,by='STATE') %>% 
   rename(count = n)
 
+
+
 temp_data <- data %>% 
   select(STATE, count) %>% 
   group_by(STATE) %>% 
@@ -209,7 +233,11 @@ coord <- us_states %>%
   summarise(
     x_avg = mean(x),
     y_avg = mean(y))
+```
 
+
+
+```{r store_per_state_starbucks_5, message = FALSE}
 new_data <- merge(temp_data, coord, by = "STATE" )
 
 final_data <- merge(new_data, us_states, by = "STATE" )
@@ -243,8 +271,10 @@ df <- df %>%
 
 df <- df %>%
   mutate(ZIP = sapply(strsplit(df$DATA, split=c(' '), fixed=TRUE), function(x) (x[2]))) 
+```
 
 
+```{r store_per_state_dunkin_2, echo = FALSE, message = FALSE}
 df<-df %>% 
   mutate(ZIP=as.numeric(ZIP))
 
@@ -274,7 +304,10 @@ coord <- us_states %>%
 new_data <- merge(temp_data, coord, by = "STATE" )
 
 final_data <- merge(new_data, us_states, by = "STATE" )
+```
 
+
+```{r store_per_state_starbucks_6, message = FALSE}
 #plot data for locations
 centroid <- aggregate(data=final_data, cbind(x_avg, y_avg) ~ n + group, FUN=mean) 
 
@@ -285,7 +318,9 @@ data%>%
   theme_map()+
   theme(panel.background = element_blank()) + ggtitle("US Dunkin' Donut's Location", subtitle = "Average # of Stores") + labs(fill = "Average") + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5),plot.subtitle =  element_text(hjust = 0.5))+
   scale_fill_gradient(low = "orange", high = "purple", guide = guide_legend()) + geom_text(data = centroid, mapping = aes(x_avg,y_avg, group = group, label = n), color = "black", inherit.aes = FALSE)
+```
 
+```{r store_per_state_starbucks_7, echo = FALSE, message = FALSE}
 #---------------------------------------------------------------------------------------------------------------------------
 # by county
 
@@ -375,7 +410,16 @@ DNKN_loc <- DNKN_loc %>%
 SBUX_loc <- SBUX_loc %>%
   mutate(density = n/state_area)
 ```
-##What states have the highest densities of Dunkin' and Starbucks?
+
+
+
+
+
+
+
+
+
+## What states have the highest densities of Dunkin' and Starbucks?
 When Washington D.C. is included in the density plots, we noticed that the data is heavily skewed, so in order to get a proper look at the densities of these companies, Washington D.C. must be filtered out.
 ```{r DC_graphs, message = FALSE}
 DNKN_loc %>%
@@ -429,7 +473,16 @@ SBUX_loc %>%
   arrange(desc(density)) %>%
   top_n(5)
 ```
-###What are the growth rates of the stocks of Dunkin' and Starbucks?
+
+
+
+
+
+
+
+
+
+## What are the growth rates of the stocks of Dunkin' and Starbucks?
 ```{r stock, message = FALSE}
 
 DNKN <- read_csv("data/modified_DNKN.csv")
@@ -455,7 +508,13 @@ D_S <- tibble(
               pull(close))
 )
 ```
-#Monthly Stock Close
+
+
+
+
+
+
+# Monthly Stock Close
 ```{r monthly_stock, message = FALSE}
 D_S %>%
   group_by(stock) %>%
@@ -469,6 +528,10 @@ D_S %>%
   guides(color = guide_legend(title = "Stock Symbols")) +
   theme(plot.title = element_text(hjust = 0.5))
 ```
+
+
+
+
 #Prediction Values
 ```{r percent_error, message = FALSE}
 Starbucks_intercepts<-lm(SBUX$close~SBUX$timestamp)[1]$coefficient
@@ -484,7 +547,16 @@ yrly <- D_S %>%
   group_by(year, stock) %>%
   summarize(mean_close = mean(close))
 ```
-#Yearly Mean Stock Close
+
+
+
+
+
+
+
+
+
+# Yearly Mean Stock Close
 ```{r yearly_mean, message = FALSE}
 yrly %>%
   group_by(stock) %>%
@@ -498,8 +570,16 @@ yrly %>%
   theme(plot.title = element_text(hjust = 0.5))
 
 ```
-###What are some patterns that show in the data of either Dunkin' or Starbucks?
-```{r revenue_starbucks, message = FALSE, warning = FALSE}
+
+
+
+
+
+
+
+
+## What are some patterns that show in the data of either Dunkin' or Starbucks?
+```{r revenue_starbucks, message = FALSE, echo = FALSE, warning = FALSE}
 #Revenue of company stores
 starbuck_rev<- read_csv("data/starbucks.csv")
 
@@ -514,12 +594,17 @@ starbuck_rev <- starbuck_rev %>%
 starbuck_rev <- starbuck_rev %>% 
   group_by(Type, year) %>% 
   summarise(mean = mean(count))
+```
+
+```{r revenue_starbucks_2, message = FALSE, warning = FALSE}
  starbuck_rev %>% 
    ggplot() + 
    geom_col(mapping = aes(reorder(year, mean),
                           y = mean, fill=Type)) + labs(title = "Starbuck's Revenue")+
-   theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Revenue")  +  facet_wrap(~Type, nrow = 3, scales = "free") + coord_flip()
+   theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Revenue")  +  facet_wrap(~Type, nrow = 3, scales = "free")
+```
 
+```{r revenue_starbucks_3, message = FALSE, echo = FALSE, warning = FALSE}
 # starbuck_rev %>%
 # group_by(Type) %>%
 #   ggplot(mapping = aes(x = year, y = mean)) +
@@ -545,13 +630,17 @@ starbuck_rev <- starbuck_rev %>%
 #                          y = mean, fill=Type)) + labs(title = "Starbuck's Revenue/Country(LS)")+
 #   theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Revenue") + scale_fill_brewer(palette = "Set2")  +  facet_wrap(~Type, nrow = 3, scales = "free") + coord_flip()
 #   scale_y_continuous(limits = c(0, 20000))
+```
 
+```{r revenue_starbucks_4, message = FALSE, warning = FALSE}
 starbuck_rev %>%
   group_by(Type) %>%
   ggplot(mapping = aes(x = year, y = mean)) +
   geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free")+ labs(title = "Starbuck's Revenue")+ labs(title = "Starbuck's Revenue/Country(LS)")+
 theme(plot.title = element_text(hjust = 0.5))
+```
 
+```{r revenue_starbucks_5, message = FALSE, echo = FALSE, warning = FALSE}
 
 #revenue by country(com)
 
@@ -575,6 +664,10 @@ starbuck_rev <- starbuck_rev %>%
 #                          y = mean, fill=Type)) + labs(title = "Starbuck's Reveue/Country(OS)")+
 #   theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Revenue") + scale_fill_brewer(palette = "Set2")  +  facet_wrap(~Type, nrow = 3, scales = "free") + coord_flip()
 
+```
+
+
+```{r revenue_starbucks_6, message = FALSE, warning = FALSE}
 starbuck_rev %>%
   group_by(Type) %>%
   ggplot(mapping = aes(x = year, y = mean, )) +
@@ -582,7 +675,7 @@ starbuck_rev %>%
 
 ```
 
-```{r revenue_dunkin, message = FALSE, warning = FALSE}
+```{r revenue_dunkin, message = FALSE, echo = FALSE, warning = FALSE}
 dunk_rev<- read_csv("data/dunkin.csv")
 
 dunk_rev <- dunk_rev %>% 
@@ -597,6 +690,10 @@ dunk_rev <- dunk_rev %>%
     `Baskin Robin US Company` = BR_US_C,
     `Dunkin US Company` = DD_US_C
   )
+```
+
+
+```{r revenue_dunkin_1, message = FALSE, warning = FALSE}
 dunk_rev <- dunk_rev %>% 
   select(`Dunkin US Franchise`, `Dunkin International Franchise`, `Baskin Robin US Franchise`,  `Baskin Robin International Franchise`,`Baskin Robin US Company`,`Dunkin US Company`, year_of_publish) %>% 
   gather(Type, count,`Dunkin US Franchise`, `Dunkin International Franchise` , `Baskin Robin US Franchise` ,`Baskin Robin International Franchise`,`Baskin Robin US Company`,`Dunkin US Company`) %>% 
@@ -607,7 +704,13 @@ dunk_rev <- dunk_rev %>%
 dunk_rev <- dunk_rev%>% 
   group_by(Type, year_of_publish) %>% 
   summarise(mean = mean(count))
+```
 
+
+
+
+## Dunkin Donuts Store Count
+```{r revenue_dunkin_9, message = FALSE, warning = FALSE}
 dunk_rev %>% 
     ggplot() +
     geom_col(mapping = aes(reorder(year_of_publish, mean),
@@ -618,9 +721,10 @@ dunk_rev %>%
 #   group_by(Type) %>% 
 #   ggplot(mapping = aes(x = year_of_publish, y = mean)) +
 #   geom_line(mapping = aes(color = Type)) + ylab("Store Count") + xlab("Year")+ facet_wrap(~Type, scales = "free")+ labs(title = "Dunkin Donut's Store Count")+ theme(plot.title = element_text(hjust = 0.5))
+```
 
 
-#----------------------------------------------------------------------------
+```{r revenue_dunkin_2, message = FALSE, echo = FALSE, warning = FALSE}
 dunk_rev<- read_csv("data/dunkin.csv")
 
 dunk_rev <- dunk_rev %>% 
@@ -645,7 +749,11 @@ dunk_rev <- dunk_rev %>%
 dunk_rev <- dunk_rev%>% 
   group_by(Type, year_of_publish) %>% 
   summarise(mean = mean(count))
+```
 
+
+## Dunkin Donuts Revenue
+```{r revenue_dunkin_3, message = FALSE, warning = FALSE}
 dunk_rev %>%
   group_by(Type) %>% 
   ggplot(mapping = aes(x = year_of_publish, y = mean)) +
