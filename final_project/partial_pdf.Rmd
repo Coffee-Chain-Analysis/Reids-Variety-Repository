@@ -104,7 +104,7 @@ sbuxloc %>%
   addMarkers(~Longitude, ~Latitude, popup = sbuxLabel, label = sbuxLabel)
 ```
 
-```{r dnkn_sbux, echo = FALSE, message = FALSE}
+```{r dnkn_sbux,  message = FALSE}
 dnkn_sbux <- tibble(
   longitude = c(dnknloc %>%
                   pull(Longitude), sbuxloc %>%
@@ -274,8 +274,9 @@ data %>%
   theme(legend.position="bottom", plot.title = element_text(hjust = 0.5),plot.subtitle =  element_text(hjust = 0.5)) +geom_text(data = centroid, mapping = aes(x_avg,y_avg, group = group, label = count), color = "black", inherit.aes = FALSE)+ scale_fill_gradient(low = "orange", high = "purple", guide = guide_legend())
 
 data %>%
-  arrange(desc(n)) %>%
-  top_n(5)
+  arrange(desc(count)) %>%
+  distinct(STATE, count) %>% 
+  head(5)
 
 ```
 
@@ -288,6 +289,8 @@ us_states<-map_data("state")
 zip<-zip %>% 
   mutate(ZIP=as.numeric(ZIP))
   
+
+
 df <- df %>%
   mutate(ZIP = sapply(strsplit(df$X4, split='|', fixed=TRUE), function(x) (x[2]))) 
 
@@ -299,7 +302,7 @@ df <- df %>%
 ```
 
 
-```{r store_per_state_dunkin_2, echo = FALSE, message = FALSE}
+```{r store_per_state_dunkin_2, message = FALSE}
 df<-df %>% 
   mutate(ZIP=as.numeric(ZIP))
 
@@ -346,10 +349,11 @@ data%>%
 
 data %>%
   arrange(desc(n)) %>%
-  top_n(5)
+  distinct(STATE, count) %>% 
+  head(5)
 ```
 
-```{r store_per_state_starbucks_7, echo = FALSE, message = FALSE}
+```{r store_per_state_starbucks_7,message = FALSE}
 #---------------------------------------------------------------------------------------------------------------------------
 # by county
 
@@ -579,14 +583,14 @@ Dunkin_average_growth_rate<-(tail(DNKN,1)$close-head(DNKN,1)$close)/tail(DNKN,1)
 
 ```
 Yearly Growth rate for Starbucks and Dunkin respectively
-```{r year_values,message=FALSE}
+```{r year_values_1,message=FALSE}
 Starbucks_average_growth_rate
 Dunkin_average_growth_rate
 ```
 Dunkin exceed a bit where as starbucks is almost in range. Starbuck stock yeild is coming down because of the stock split happening in 2015.
 
 What would the monthly growth rate be for Starbucks and Dunkin be?
-```{r year_values,message=FALSE}
+```{r year_values_2,message=FALSE}
 Starbucks_monthly_average_growth_rate
 Dunkin_monthly_average_growth_rate
 ```
@@ -630,7 +634,7 @@ yrly %>%
 
 
 ## What are some patterns that show in the data of either Dunkin' or Starbucks?
-```{r revenue_starbucks, message = FALSE, echo = FALSE, warning = FALSE}
+```{r revenue_starbucks, message = FALSE, warning = FALSE}
 #Revenue of company stores
 starbuck_rev<- read_csv("data/starbucks.csv")
 
@@ -651,11 +655,70 @@ starbuck_rev <- starbuck_rev %>%
  starbuck_rev %>% 
    ggplot() + 
    geom_col(mapping = aes(reorder(year, mean),
-                          y = mean, fill=Type)) + labs(title = "Starbuck's Store Count")+
+                          y = mean, fill=Type)) + labs(title = "Starbuck's Store Count(LS)")+
    theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Count")  +  facet_wrap(~Type, nrow = 3, scales = "free")
 ```
 
-```{r revenue_starbucks_3, message = FALSE, echo = FALSE, warning = FALSE}
+
+## Starbucks Store Count
+```{r revenue_starbucks_4, message = FALSE, warning = FALSE}
+
+starbuck_rev %>%
+  ggplot() +
+  geom_col(mapping = aes(reorder(year, mean),
+                         y = mean, fill=Type)) + labs(title = "Starbuck's Store Count(OS)")+
+  theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Count") + scale_fill_brewer(palette = "Set2")  +  facet_wrap(~Type, nrow = 3, scales = "free") 
+
+```
+
+At the visual inspection from 2015 we saw the CAP segment license dropping and comapany owned increasing. On further analysis we concluded that the business model of the Starbucks store is license where company creates company owned stores and then licenses in bulk. 2015 was the only time they happened in reverse and we could track this detail down.
+
+
+```{r revenue_dunkin, message = FALSE,  warning = FALSE}
+dunk_rev<- read_csv("data/dunkin.csv")
+
+dunk_rev <- dunk_rev %>% 
+  select(year_of_publish, DD_US_F:BR_US_C, Franchise_income, Rental_income:Total_reveneu)
+
+dunk_rev <- dunk_rev %>% 
+  rename(
+    `Dunkin US Franchise` = DD_US_F,
+    `Dunkin International Franchise` = DD_IN_F,
+    `Baskin Robin US Franchise` = BR_US_F,
+    `Baskin Robin International Franchise` = BR_IN_F,
+    `Baskin Robin US Company` = BR_US_C,
+    `Dunkin US Company` = DD_US_C
+  )
+```
+
+
+```{r revenue_dunkin_1, message = FALSE, warning = FALSE}
+dunk_rev <- dunk_rev %>% 
+  select(`Dunkin US Franchise`, `Dunkin International Franchise`, `Baskin Robin US Franchise`,  `Baskin Robin International Franchise`,`Baskin Robin US Company`,`Dunkin US Company`, year_of_publish) %>% 
+  gather(Type, count,`Dunkin US Franchise`, `Dunkin International Franchise` , `Baskin Robin US Franchise` ,`Baskin Robin International Franchise`,`Baskin Robin US Company`,`Dunkin US Company`) %>% 
+  na.omit()
+
+
+
+dunk_rev <- dunk_rev%>% 
+  group_by(Type, year_of_publish) %>% 
+  summarise(mean = mean(count))
+```
+
+
+## Dunkin Donuts Store Count
+```{r revenue_dunkin_9, message = FALSE, warning = FALSE}
+dunk_rev %>% 
+    ggplot() +
+    geom_col(mapping = aes(reorder(year_of_publish, mean),
+                           y = mean, fill=Type)) +
+    theme(plot.title = element_text(hjust = 0.5)) + ylab("Store Count") + xlab("Year")+ labs(title = "Dunkin Donut's Store Count")+ facet_wrap(~Type, scales = "free")
+```
+ 
+At the visual inspection of the Dunkin company stores went down to zero in 2017.
+Upon further inspection we figured out that the Dunkin model is franchise based and it changed to 100% franchise in 2016 dropping all it's ompany operated stores.
+
+```{r revenue_starbucks_3, message = FALSE, warning = FALSE}
 starbuck_rev<- read_csv("data/starbucks.csv")
 
 starbuck_rev <- starbuck_rev %>% 
@@ -671,7 +734,7 @@ starbuck_rev <- starbuck_rev %>%
   summarise(mean = mean(count))
 ```
 
-```{r revenue_starbucks_5, message = FALSE, echo = FALSE, warning = FALSE}
+```{r revenue_starbucks_5, message = FALSE, warning = FALSE}
 
 #revenue by country(com)
 
@@ -702,9 +765,10 @@ We found these patterns by analzing visually.
 By inspection, these resulted from analyzing all 10-K files data.
 ```{r revenue_starbucks_6, message = FALSE, warning = FALSE}
 starbuck_rev %>%
-  group_by(Type) %>%
-  ggplot(mapping = aes(x = year, y = mean, )) +
-  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free") + labs(title = "Starbuck's Reveue/Country(OS)") + theme(plot.title = element_text(hjust = 0.5))
+group_by(Type) %>%
+  ggplot(mapping = aes(x = year, y = mean)) +
+  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free") + labs(title = "Starbuck's Revenue")+ theme(plot.title = element_text(hjust = 0.5))
+
 
 ```
 2014- Opens first Starbucks Reserve® Roastery and Tasting Room in Seattle.
@@ -716,7 +780,7 @@ Launches Starbucks Mobile Order & Pay.
 
 2017- Purchased all of CAP segments. Opened many stores in Americas,emas, Food, consumer packaged goods production like coffee, Keurig cups was hurting so contract to nestle. Improved Starbucks siren(Reserve store)
 
-```{r revenue_dunkin_2, message = FALSE, echo = FALSE, warning = FALSE}
+```{r revenue_dunkin_2, message = FALSE, warning = FALSE}
 dunk_rev<- read_csv("data/dunkin.csv")
 
 dunk_rev <- dunk_rev %>% 
@@ -761,58 +825,4 @@ dunk_rev %>%
 But the main increase was due to  recognizing advertising revenue(5% of each store sales) separately from this balance sheet. The growth actually declined Other the real growth is 828027 
 
 
-
-```{r revenue_dunkin, message = FALSE, echo = FALSE, warning = FALSE}
-dunk_rev<- read_csv("data/dunkin.csv")
-
-dunk_rev <- dunk_rev %>% 
-  select(year_of_publish, DD_US_F:BR_US_C, Franchise_income, Rental_income:Total_reveneu)
-
-dunk_rev <- dunk_rev %>% 
-  rename(
-    `Dunkin US Franchise` = DD_US_F,
-    `Dunkin International Franchise` = DD_IN_F,
-    `Baskin Robin US Franchise` = BR_US_F,
-    `Baskin Robin International Franchise` = BR_IN_F,
-    `Baskin Robin US Company` = BR_US_C,
-    `Dunkin US Company` = DD_US_C
-  )
-```
-
-
-```{r revenue_dunkin_1, message = FALSE, warning = FALSE}
-dunk_rev <- dunk_rev %>% 
-  select(`Dunkin US Franchise`, `Dunkin International Franchise`, `Baskin Robin US Franchise`,  `Baskin Robin International Franchise`,`Baskin Robin US Company`,`Dunkin US Company`, year_of_publish) %>% 
-  gather(Type, count,`Dunkin US Franchise`, `Dunkin International Franchise` , `Baskin Robin US Franchise` ,`Baskin Robin International Franchise`,`Baskin Robin US Company`,`Dunkin US Company`) %>% 
-  na.omit()
-
-
-
-dunk_rev <- dunk_rev%>% 
-  group_by(Type, year_of_publish) %>% 
-  summarise(mean = mean(count))
-```
-
-## Starbucks Store Count
-```{r revenue_starbucks_4, message = FALSE, warning = FALSE}
-starbuck_rev %>%
-  group_by(Type) %>%
-  ggplot(mapping = aes(x = year, y = mean)) +
-  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free")+ labs(title = "Starbuck's Revenue")+ labs(title = "Starbuck's Revenue/Country(LS)")+
-theme(plot.title = element_text(hjust = 0.5))
-```
-
-At the visual inspection from 2015 we saw the CAP segment license dropping and comapany owned increasing. On further analysis we concluded that the business model of the Starbucks store is license where company creates company owned stores and then licenses in bulk. 2015 was the only time they happened in reverse and we could track this detail down.
-
-## Dunkin Donuts Store Count
-```{r revenue_dunkin_9, message = FALSE, warning = FALSE}
-dunk_rev %>% 
-    ggplot() +
-    geom_col(mapping = aes(reorder(year_of_publish, mean),
-                           y = mean, fill=Type)) +
-    theme(plot.title = element_text(hjust = 0.5)) + ylab("Store Count") + xlab("Year")+ labs(title = "Dunkin Donut's Store Count")+ facet_wrap(~Type, scales = "free")
-```
- 
-At the visual inspection of the Dunkin company stores went down to zero in 2017.
-Upon further inspection we figured out that the Dunkin model is franchise based and it changed to 100% franchise in 2016 dropping all it's ompany operated stores.
 
