@@ -1,12 +1,12 @@
 ---
-title: "partial_pdf"
-author: "me"
-date: "11/30/2019"
+title: "Group 4 Writeup"
+author: "Reid Jumper, Harsh Nagarkar, and Micheal Davis"
+date: "12/4/2019"
 output:
   html_document:
     df_print: paged
 ---
-
+###Analysis of Public Coffee Chains
 ```{r setup}
 knitr::opts_chunk$set(echo = TRUE)
 library(webshot)
@@ -26,7 +26,7 @@ library(zoo)
 #webshot::install_phantomjs
 
 ```
-
+###Where are the companies, Dunkin' Donuts and Starbucks, competing?
 ```{r locations, message=FALSE}
 sbuxloc <- read_csv("data/sbuxlocations.csv")
 dnknloc <- read_csv("data/dnknlocations.csv", col_names = FALSE)
@@ -57,7 +57,9 @@ dnknLabel <- sprintf("<b>Dunkin'</b><br>%s", dnknloc$State) %>%
 sbuxLabel <- sprintf("<b>Starbucks</b><br>%s", sbuxloc$`State/Province`) %>%
   lapply(htmltools::HTML)
 ```
-Dunkin' Leaflet
+First, it is important to look at where these restaurants are located in the US.
+
+#Dunkin' Leaflet
 ```{r leaflet_maps_dnkn, message = FALSE}
 dnknloc %>%
   leaflet(width = "100%", options = leafletOptions(zoomSnap = 0.1)) %>%
@@ -65,7 +67,7 @@ dnknloc %>%
   addTiles() %>%
   addMarkers(~Longitude, ~Latitude, popup = dnknLabel, label = dnknLabel)
 ```
-Starbucks Leaflet
+#Starbucks Leaflet
 ```{r leaflet_maps_sbux, message = FALSE}
 sbuxloc %>%
   leaflet(width = "100%", options = leafletOptions(zoomSnap = 0.1)) %>%
@@ -142,7 +144,7 @@ scale_coord <- function(abbreviation, x, y) {
 modified_values <- scale_coord(dnkn_sbux$state, dnkn_sbux$longitude, dnkn_sbux$latitude) %>%
   mutate(Store = dnkn_sbux$store)
 ```
-Locations Graphs
+#Locations Graphs
 ```{r graph_locations, message = FALSE}
 ggplot() +
   geom_polygon(data = us_map(regions = "states"), mapping = aes(x = x, y = y, group = group), color = "gray", fill = "cornsilk") +
@@ -157,7 +159,7 @@ ggplot() +
         plot.subtitle = element_text(hjust = 0.5))
 
 ```
-
+##Which states have the highest number of stores for Dunkin Donuts and Starbucks?
 ```{r store_per_state_starbucks, message = FALSE} 
 #gather data from csv files
 starbuck_local<- read_csv("data/directory.csv")
@@ -338,63 +340,6 @@ new_data <- data %>%
   head(20) 
 ```
 
-```{r store_per_state_baskin_bobbins}
-df<- read_csv("data/Baskin-Robbins_USA_CAN.csv",col_names = FALSE)
-zip<-read_csv("data/ZIP-COUNTY-FIPS-2018.csv")
-county_map <- county_map
-us_states<-map_data("state")
-
-zip<-zip %>% 
-  mutate(ZIP=as.numeric(ZIP))
-
-df<-df %>% 
-  mutate(data=sapply(strsplit(df$X4, split=',', fixed=TRUE), function(x) (x[3])))
-
-df<- df %>% 
-  mutate(STATE=sapply(strsplit(df$data, split=' ', fixed=TRUE), function(x) (x[1])),ZIP=as.numeric(sapply(strsplit(df$data, split=' ', fixed=TRUE), function(x) (x[2]))))
-
-data<-left_join(df,zip, by=c("ZIP")) %>%
-  select(-STATE.x) %>%
-  rename(STATE = STATE.y) %>%
-  group_by(STATE) %>%
-  count() %>%
-  na.omit()
-
-us_states<-us_map("states") %>% 
-  rename(STATE=abbr)
-
-data<-left_join(us_states,data,by='STATE')  
-
-temp_data <- data %>% 
-  select(STATE, n) %>% 
-  group_by(STATE) %>% 
-  summarise(n = mean(n))
-
-coord <- us_states %>% 
-  select(x, y, STATE) %>% 
-  group_by(STATE) %>% 
-  summarise(
-    x_avg = mean(x),
-    y_avg = mean(y))
-
-
-new_data <- merge(temp_data, coord, by = "STATE" )
-
-final_data <- merge(new_data, us_states, by = "STATE" )
-
-#plot data for locations
-centroid <- aggregate(data=final_data, cbind(x_avg, y_avg) ~ n + group, FUN=mean) 
-
-data%>% 
-  ggplot() +
-  geom_polygon(mapping = aes(x=x,y=y,group=group,fill=n),color = "lightgray", size = 0.5) +
-  coord_equal()+
-  theme_map()+
-  theme(panel.background = element_blank()) + ggtitle("Baskin Robbin's Location", subtitle = "Total # of Stores") + labs(fill = "Average") + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5),plot.subtitle =  element_text(hjust = 0.5))+
-  scale_fill_gradient(low = "orange", high = "purple", guide = guide_legend()) + geom_text(data = centroid, mapping = aes(x_avg,y_avg, group = group, label = n), color = "black", inherit.aes = FALSE)
-
-```
-
 ```{r density, message=FALSE}
 sq_mileage <- read_csv("data/mileage.csv")
 DNKN_loc <- read_csv("data/DD-US.csv", col_names = FALSE)
@@ -430,7 +375,8 @@ DNKN_loc <- DNKN_loc %>%
 SBUX_loc <- SBUX_loc %>%
   mutate(density = n/state_area)
 ```
-Density with DC
+##What states have the highest densities of Dunkin' and Starbucks?
+When Washington D.C. is included in the density plots, we noticed that the data is heavily skewed, so in order to get a proper look at the densities of these companies, Washington D.C. must be filtered out.
 ```{r DC_graphs, message = FALSE}
 DNKN_loc %>%
   ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
@@ -456,7 +402,7 @@ DNKN_loc <- DNKN_loc %>%
 SBUX_loc <- SBUX_loc %>%
   filter(state %nin% c("DC"))
 ```
-Density without DC
+
 ```{r dens_graphs, message = FALSE}
 DNKN_loc %>%
   ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
@@ -474,8 +420,16 @@ SBUX_loc %>%
   scale_fill_distiller(palette = "Set1") +
   labs(title = "Starbucks Locations") +
   theme(plot.title = element_text(hjust = 0.5))
+DNKN_loc %>%
+  distinct(state, density) %>%
+  arrange(desc(density)) %>%
+  top_n(5)
+SBUX_loc %>%
+  distinct(state, density) %>%
+  arrange(desc(density)) %>%
+  top_n(5)
 ```
-
+###What are the growth rates of the stocks of Dunkin' and Starbucks?
 ```{r stock, message = FALSE}
 
 DNKN <- read_csv("data/modified_DNKN.csv")
@@ -501,7 +455,7 @@ D_S <- tibble(
               pull(close))
 )
 ```
-Monthly Stock Close
+#Monthly Stock Close
 ```{r monthly_stock, message = FALSE}
 D_S %>%
   group_by(stock) %>%
@@ -515,7 +469,7 @@ D_S %>%
   guides(color = guide_legend(title = "Stock Symbols")) +
   theme(plot.title = element_text(hjust = 0.5))
 ```
-Prediction graph
+#Prediction Values
 ```{r percent_error, message = FALSE}
 Starbucks_intercepts<-lm(SBUX$close~SBUX$timestamp)[1]$coefficient
 Starbucks_monthly_average_growth_rate<-(-atan(Starbucks_intercepts[1]/Starbucks_intercepts[2]))
@@ -530,7 +484,7 @@ yrly <- D_S %>%
   group_by(year, stock) %>%
   summarize(mean_close = mean(close))
 ```
-Yearly Mean Stock Close
+#Yearly Mean Stock Close
 ```{r yearly_mean, message = FALSE}
 yrly %>%
   group_by(stock) %>%
@@ -544,7 +498,7 @@ yrly %>%
   theme(plot.title = element_text(hjust = 0.5))
 
 ```
-
+###What are some patterns that show in the data of either Dunkin' or Starbucks?
 ```{r revenue_starbucks, message = FALSE, warning = FALSE}
 #Revenue of company stores
 starbuck_rev<- read_csv("data/starbucks.csv")
