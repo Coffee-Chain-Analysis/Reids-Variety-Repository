@@ -19,7 +19,9 @@ df<- df %>%
 
 
 
-data<-left_join(df,zip, by=c("ZIP")) %>% 
+data<-left_join(df,zip, by=c("ZIP")) %>%
+  select(-STATE.x) %>% 
+  rename(STATE=STATE.y) %>% 
   group_by(STATE) %>%
   count() %>%
   na.omit()
@@ -41,6 +43,8 @@ coord <- us_states %>%
     x_avg = mean(x),
     y_avg = mean(y))
 
+data %>% 
+  arrange(desc(n))
 
 new_data <- merge(temp_data, coord, by = "STATE" )
 

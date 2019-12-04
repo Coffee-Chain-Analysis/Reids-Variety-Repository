@@ -53,9 +53,9 @@ SBUX<-SBUX %>%
 DNKN<-DNKN %>% 
   arrange(timestamp)
 
-Starbucks_average_growth_rate<-(head(SBUX,1)$close/tail(SBUX,1)$close)/7*100
+Starbucks_average_growth_rate<-(tail(SBUX,1)$close-head(SBUX,1)$close)/tail(SBUX,1)$close*100/7
 
-Dunkin_average_growth_rate<-(head(DNKN,1)$close/tail(DNKN,1)$close)/7*100
+Dunkin_average_growth_rate<-(tail(DNKN,1)$close-head(DNKN,1)$close)/tail(DNKN,1)$close*100/7
 
 
 
@@ -88,4 +88,20 @@ temp %>%
   group_by(stock) %>%
   ggplot() +
   geom_line(mapping = aes(x = year, y = mean_close, color = stock))
+
+
+
+
+
+D_S %>%
+  group_by(stock) %>%
+  ggplot() +
+  geom_line(mapping = aes(x = timestamp, y = close, color = stock)) +
+  scale_color_manual(values = c("red", "green")) +
+  geom_smooth(mapping = aes(timestamp,close,color=stock),method = "lm") +
+  labs(title = "Monthly Close Values",
+       x = "Year",
+       y = "Close Value") +
+  guides(color = guide_legend(title = "Stock Symbols")) +
+  theme(plot.title = element_text(hjust = 0.5))
 
