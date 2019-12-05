@@ -1,11 +1,35 @@
 ---
-title: "partial_pdf"
-author: "me"
-date: "11/30/2019"
-output: pdf_document
+title: "Group 4 Writeup"
+author: "Reid Jumper, Harsh Nagarkar, and Micheal Davis"
+date: "12/4/2019"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
 ---
+## Analysis of Public Coffee Chains
 
-```{r setup, include=FALSE, echo = FALSE}
+WHO SHOULD YOU INVEST INTO?
+
+Company Description
+
+Quick service  restaurant
+
+Starbucks Corporation (formed in 1985) - Seattle Washington  - 17 countries. 
+selling coffee, tea and deli items.
+
+DUNKIN’ BRANDS GROUP, INC. (formed in 1980) entered in  market 2002 
+Made of 
+ Dunkin Donuts (Donuts Breakfast)
+ Baskins and Robins (Icecreams,cakes)
+
+In order to compare these companies strength and fruitfulness we choose to investigate using 3 categories
+1. US store competition analysis
+2. Stock growth analysis
+3. Sec sales and stores analysis
+
+
+```{r setup}
 knitr::opts_chunk$set(echo = TRUE)
 library(webshot)
 library(tidyverse)
@@ -24,11 +48,13 @@ library(zoo)
 webshot::install_phantomjs
 
 ```
-
-```{r locations, message=FALSE, echo = FALSE}
+## Where are the companies, Dunkin' Donuts and Starbucks, competing?
+```{r locations, message=FALSE}
 sbuxloc <- read_csv("data/sbuxlocations.csv")
 dnknloc <- read_csv("data/dnknlocations.csv", col_names = FALSE)
+```
 
+```{r locations_2, message=FALSE}
 dnknloc <- dnknloc %>%
   rename(Longitude = X1,
          Latitude = X2,
@@ -55,7 +81,9 @@ dnknLabel <- sprintf("<b>Dunkin'</b><br>%s", dnknloc$State) %>%
 sbuxLabel <- sprintf("<b>Starbucks</b><br>%s", sbuxloc$`State/Province`) %>%
   lapply(htmltools::HTML)
 ```
-### Dunkin' Leaflet
+
+First, it is important to look at where these restaurants are located in the US.
+# Dunkin' Leaflet
 ```{r leaflet_maps_dnkn, message = FALSE}
 dnknloc %>%
   leaflet(width = "100%", options = leafletOptions(zoomSnap = 0.1)) %>%
@@ -63,7 +91,11 @@ dnknloc %>%
   addTiles() %>%
   addMarkers(~Longitude, ~Latitude, popup = dnknLabel, label = dnknLabel)
 ```
-Starbucks Leaflet
+
+
+
+
+# Starbucks Leaflet
 ```{r leaflet_maps_sbux, message = FALSE}
 sbuxloc %>%
   leaflet(width = "100%", options = leafletOptions(zoomSnap = 0.1)) %>%
@@ -72,7 +104,7 @@ sbuxloc %>%
   addMarkers(~Longitude, ~Latitude, popup = sbuxLabel, label = sbuxLabel)
 ```
 
-```{r dnkn_sbux, message = FALSE, echo = FALSE}
+```{r dnkn_sbux,  message = FALSE}
 dnkn_sbux <- tibble(
   longitude = c(dnknloc %>%
                   pull(Longitude), sbuxloc %>%
@@ -90,6 +122,7 @@ dnkn_sbux <- tibble(
 
 scale_coord <- function(abbreviation, x, y) {
   library(usmap)
+  min_max <- read_csv("data/min_max_coord.csv")
   values <- tibble(
     abbreviation = abbreviation,
     x = x,
@@ -105,15 +138,10 @@ scale_coord <- function(abbreviation, x, y) {
   scaler <- scaler %>%
     mutate(variation.x = max.x - min.x,
            variation.y = max.y - min.y)
-  base <- values %>%
-    group_by(abbreviation) %>%
-    summarize(max.x = max(x),
-              max.y = max(y),
-              min.x = min(x),
-              min.y = min(y))
-  base <- base %>%
-    mutate(variation.x = max.x - min.x,
-           variation.y = max.y - min.y)
+  min_max <- min_max %>%
+    mutate(variation.long = max_long - min_long,
+           variation.lat = max_lat - min_lat) %>%
+    arrange(abbr)
   longitude <- c()
   latitude <- c()
   indexes <- c()
@@ -129,8 +157,8 @@ scale_coord <- function(abbreviation, x, y) {
   }
   count <- 1
   for(index in indexes) {
-    longitude <- c(longitude, ((values$x[count]-base$min.x[index])/base$variation.x[index]) * scaler$variation.x[index] + scaler$min.x[index])
-    latitude <- c(latitude, ((values$y[count]-base$min.y[index])/base$variation.y[index]) * scaler$variation.y[index] + scaler$min.y[index])
+    longitude <- c(longitude, ((values$x[count]-min_max$min_long[index])/min_max$variation.long[index]) * scaler$variation.x[index] + scaler$min.x[index])
+    latitude <- c(latitude, ((values$y[count]-min_max$min_lat[index])/min_max$variation.lat[index]) * scaler$variation.y[index] + scaler$min.y[index])
     count <- count + 1
   }
   return_tibble <- tibble(
@@ -144,7 +172,14 @@ scale_coord <- function(abbreviation, x, y) {
 modified_values <- scale_coord(dnkn_sbux$state, dnkn_sbux$longitude, dnkn_sbux$latitude) %>%
   mutate(Store = dnkn_sbux$store)
 ```
-Locations Graphs
+
+
+
+
+
+
+
+# Locations Graphs
 ```{r graph_locations, message = FALSE}
 ggplot() +
   geom_polygon(data = us_map(regions = "states"), mapping = aes(x = x, y = y, group = group), color = "gray", fill = "cornsilk") +
@@ -160,7 +195,15 @@ ggplot() +
 
 ```
 
-```{r store_per_state_starbucks, message = FALSE, echo = FALSE} 
+
+
+
+
+
+
+
+## Which states have the highest number of stores for Dunkin Donuts and Starbucks?
+```{r store_per_state_starbucks, message = FALSE} 
 #gather data from csv files
 starbuck_local<- read_csv("data/directory.csv")
 starbuck_zip<-read_csv("data/ZIP-COUNTY-FIPS-2018.csv")
@@ -198,6 +241,8 @@ us_states<-us_map("states") %>%
 data<-left_join(us_states,data,by='STATE') %>% 
   rename(count = n)
 
+
+
 temp_data <- data %>% 
   select(STATE, count) %>% 
   group_by(STATE) %>% 
@@ -209,7 +254,11 @@ coord <- us_states %>%
   summarise(
     x_avg = mean(x),
     y_avg = mean(y))
+```
 
+
+
+```{r store_per_state_starbucks_5, message = FALSE}
 new_data <- merge(temp_data, coord, by = "STATE" )
 
 final_data <- merge(new_data, us_states, by = "STATE" )
@@ -224,9 +273,14 @@ data %>%
   theme(panel.background = element_blank()) + ggtitle("US Starbuck's Location", subtitle = "Average # of Stores") + labs(fill = "Count")+
   theme(legend.position="bottom", plot.title = element_text(hjust = 0.5),plot.subtitle =  element_text(hjust = 0.5)) +geom_text(data = centroid, mapping = aes(x_avg,y_avg, group = group, label = count), color = "black", inherit.aes = FALSE)+ scale_fill_gradient(low = "orange", high = "purple", guide = guide_legend())
 
+data %>%
+  distinct(STATE, count) %>%
+  arrange(desc(count)) %>%
+  head(5)
+
 ```
 
-```{r store_per_state_dunkin, message = FALSE, echo = FALSE}
+```{r store_per_state_dunkin, message = FALSE}
 df<- read_csv("data/DD-US.csv",col_names = FALSE)
 zip<-read_csv("data/ZIP-COUNTY-FIPS-2018.csv")
 county_map <- county_map
@@ -235,6 +289,8 @@ us_states<-map_data("state")
 zip<-zip %>% 
   mutate(ZIP=as.numeric(ZIP))
   
+
+
 df <- df %>%
   mutate(ZIP = sapply(strsplit(df$X4, split='|', fixed=TRUE), function(x) (x[2]))) 
 
@@ -243,8 +299,10 @@ df <- df %>%
 
 df <- df %>%
   mutate(ZIP = sapply(strsplit(df$DATA, split=c(' '), fixed=TRUE), function(x) (x[2]))) 
+```
 
 
+```{r store_per_state_dunkin_2, message = FALSE}
 df<-df %>% 
   mutate(ZIP=as.numeric(ZIP))
 
@@ -274,7 +332,10 @@ coord <- us_states %>%
 new_data <- merge(temp_data, coord, by = "STATE" )
 
 final_data <- merge(new_data, us_states, by = "STATE" )
+```
 
+
+```{r store_per_state_starbucks_6, message = FALSE}
 #plot data for locations
 centroid <- aggregate(data=final_data, cbind(x_avg, y_avg) ~ n + group, FUN=mean) 
 
@@ -286,6 +347,13 @@ data%>%
   theme(panel.background = element_blank()) + ggtitle("US Dunkin' Donut's Location", subtitle = "Average # of Stores") + labs(fill = "Average") + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5),plot.subtitle =  element_text(hjust = 0.5))+
   scale_fill_gradient(low = "orange", high = "purple", guide = guide_legend()) + geom_text(data = centroid, mapping = aes(x_avg,y_avg, group = group, label = n), color = "black", inherit.aes = FALSE)
 
+data %>%
+  arrange(desc(n)) %>%
+  distinct(STATE, count) %>% 
+  head(5)
+```
+
+```{r store_per_state_starbucks_7,message = FALSE}
 #---------------------------------------------------------------------------------------------------------------------------
 # by county
 
@@ -340,18 +408,23 @@ new_data <- data %>%
   head(20) 
 ```
 
-```{r density, message=FALSE, echo = FALSE}
+```{r density, message=FALSE}
 sq_mileage <- read_csv("data/mileage.csv")
-DNKN_loc <- read_csv("data/DunkinAvgLocations#2.csv")
-SBUX_loc <- read_csv("data/StarbuckAvgLocations#2.csv") %>%
-  rename(n = count)
+DNKN_loc <- read_csv("data/DD-US.csv", col_names = FALSE)
+SBUX_loc <- read_csv("data/directory.csv")
 
-DNKN_loc <- DNKN_loc %>%
-  distinct(STATE, n) %>%
-  rename(state = STATE)
 SBUX_loc <- SBUX_loc %>%
-  distinct(STATE, n) %>%
-  rename(state = STATE)
+  filter(Country %in% c("US")) %>%
+  rename(state = `State/Province`) %>%
+  count(state)
+DNKN_loc <- DNKN_loc %>%
+  rename(specs = X3) %>%
+  separate(specs, c("specs", "state"), sep = ",")
+DNKN_loc <- DNKN_loc %>%
+  mutate(state = DNKN_loc %>%
+           pull(state) %>%
+           str_replace_all("// ", "")) %>%
+  count(state)
 
 DNKN_loc <- left_join(us_map(region = "states") %>%
                         rename(state = abbr), DNKN_loc, by = "state")
@@ -370,7 +443,17 @@ DNKN_loc <- DNKN_loc %>%
 SBUX_loc <- SBUX_loc %>%
   mutate(density = n/state_area)
 ```
-Density with DC
+
+
+
+
+
+
+
+
+
+## What states have the highest densities of Dunkin' and Starbucks?
+When Washington D.C. is included in the density plots, we noticed that the data is heavily skewed, so in order to get a proper look at the densities of these companies, Washington D.C. must be filtered out.
 ```{r DC_graphs, message = FALSE}
 DNKN_loc %>%
   ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
@@ -390,13 +473,13 @@ SBUX_loc %>%
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
-```{r filter_DC, message = FALSE, echo = FALSE}
+```{r filter_DC, message = FALSE}
 DNKN_loc <- DNKN_loc %>%
   filter(state %nin% c("DC"))
 SBUX_loc <- SBUX_loc %>%
   filter(state %nin% c("DC"))
 ```
-Density without DC
+
 ```{r dens_graphs, message = FALSE}
 DNKN_loc %>%
   ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
@@ -414,9 +497,81 @@ SBUX_loc %>%
   scale_fill_distiller(palette = "Set1") +
   labs(title = "Starbucks Locations") +
   theme(plot.title = element_text(hjust = 0.5))
+DNKN_loc %>%
+  distinct(state, density) %>%
+  arrange(desc(density)) %>%
+  top_n(5)
+SBUX_loc %>%
+  distinct(state, density) %>%
+  arrange(desc(density)) %>%
+  top_n(5)
+```
+The most competition between Dunkin' and Starbucks is located primarily in the North and on the East Coast.  The least competition is in the north-west where Dunkin' does not have any stores.
+```{r mississippi, message = FALSE}
+
+df<- read_csv("data/DD-US.csv",col_names = FALSE)
+zip<-read_csv("data/ZIP-COUNTY-FIPS-2018.csv")
+county_map <- map_data("county") %>% 
+  filter(region=="mississippi")
+us_states<-map_data("state")
+
+zip<-zip %>% 
+  mutate(ZIP=as.numeric(ZIP))
+  
+df <- df %>%
+  mutate(ZIP = sapply(strsplit(df$X4, split='|', fixed=TRUE), function(x) (x[2]))) 
+
+df <- df %>%
+  mutate(DATA = sapply(strsplit(df$ZIP, split=c(','), fixed=TRUE), function(x) (x[2]))) 
+
+df <- df %>%
+  mutate(ZIP = sapply(strsplit(df$DATA, split=c(' '), fixed=TRUE), function(x) (x[2]))) 
+
+
+df<-df %>% 
+  mutate(ZIP=as.numeric(ZIP))
+
+data<-left_join(df,zip, by=c("ZIP")) %>% 
+  mutate(COUNTYNAME=tolower(str_remove(COUNTYNAME," County"))) %>%
+  group_by(STATE) %>%
+  na.omit() %>% 
+  filter(STATE=='MS') %>% 
+  group_by(COUNTYNAME) %>% 
+  count() 
+
+data<-data%>% 
+  rename(subregion=COUNTYNAME) 
+
+
+data<-left_join(county_map,data,by='subregion')
+
+
+data %>% 
+  ggplot()+
+  geom_polygon(mapping = aes(x=long,y=lat,group=group,fill=n),color = "lightgray", size = 0.5) +
+  coord_equal()+
+  theme_map()+
+  theme(panel.background = element_blank()) + ggtitle("Mississippi Dunkin Donut", subtitle = " # of Stores") + labs(fill = "Average") + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5),plot.subtitle =  element_text(hjust = 0.5))+
+  scale_fill_gradient(low = "orange", high = "purple", guide = guide_legend()) 
+
+data %>%
+  na.omit() %>%
+  distinct(subregion, n) %>%
+  select(subregion, n) %>%
+  arrange(desc(n))
+
 ```
 
-```{r stock, message = FALSE, echo = FALSE}
+
+
+
+
+
+
+###Do the stocks of Starbucks and Dunkin' Donuts comply with the Warren Buffet Rule?
+
+Warren claimed that over the period of time the average yearly yeild of a company is in 6-7%.
+```{r stock, message = FALSE}
 
 DNKN <- read_csv("data/modified_DNKN.csv")
 SBUX <- read_csv("data/modified_SBUX.csv")
@@ -441,7 +596,13 @@ D_S <- tibble(
               pull(close))
 )
 ```
-Monthly Stock Close
+
+
+
+
+
+
+# Monthly Stock Close
 ```{r monthly_stock, message = FALSE}
 D_S %>%
   group_by(stock) %>%
@@ -455,22 +616,55 @@ D_S %>%
   guides(color = guide_legend(title = "Stock Symbols")) +
   theme(plot.title = element_text(hjust = 0.5))
 ```
-Prediction graph
-```{r error, message = FALSE}
-sim1_mod <- lm(close ~ timestamp, data = filter(D_S,stock=="DNKN"))
-coef(sim1_mod)
 
-sim1_mod <- lm(close ~ timestamp, data = filter(D_S,stock=="SBUX"))
-coef(sim1_mod)
+
+
+
+#Prediction Values
+
+```{r percent_error, message = FALSE}
+Starbucks_intercepts<-lm(SBUX$close~SBUX$timestamp)[1]$coefficient
+Starbucks_monthly_average_growth_rate<-(-atan(Starbucks_intercepts[1]/Starbucks_intercepts[2]))
+
+Dunkin_intercepts<-lm(DNKN$close~DNKN$timestamp)[1]$coefficient
+Dunkin_monthly_average_growth_rate<-(-atan(Dunkin_intercepts[1]/Dunkin_intercepts[2]))
+
+
+Starbucks_average_growth_rate<-(tail(SBUX,1)$close-head(SBUX,1)$close)/tail(SBUX,1)$close*100/7
+
+Dunkin_average_growth_rate<-(tail(DNKN,1)$close-head(DNKN,1)$close)/tail(DNKN,1)$close*100/7
+
+```
+Yearly Growth rate for Starbucks and Dunkin respectively
+```{r year_values_1,message=FALSE}
+Starbucks_average_growth_rate
+Dunkin_average_growth_rate
+```
+Dunkin exceed a bit where as starbucks is almost in range. Starbuck stock yeild is coming down because of the stock split happening in 2015.
+
+What would the monthly growth rate be for Starbucks and Dunkin be?
+```{r year_values_2,message=FALSE}
+Starbucks_monthly_average_growth_rate
+Dunkin_monthly_average_growth_rate
 ```
 
-```{r mutate_DS, message = FALSE, echo = FALSE}
+
+```{r mutate_DS, message = FALSE}
 yrly <- D_S %>%
   mutate(year = year(timestamp)) %>%
   group_by(year, stock) %>%
   summarize(mean_close = mean(close))
 ```
-Yearly Mean Stock Close
+
+
+
+
+
+
+
+
+
+# Yearly Mean Stock Close
 ```{r yearly_mean, message = FALSE}
 yrly %>%
   group_by(stock) %>%
@@ -485,7 +679,15 @@ yrly %>%
 
 ```
 
-```{r revenue_starbucks, message = FALSE, echo = FALSE, warning = FALSE}
+
+
+
+
+
+
+
+## What are some patterns that show in the data of either Dunkin' or Starbucks?
+```{r revenue_starbucks, message = FALSE, warning = FALSE}
 #Revenue of company stores
 starbuck_rev<- read_csv("data/starbucks.csv")
 
@@ -500,18 +702,76 @@ starbuck_rev <- starbuck_rev %>%
 starbuck_rev <- starbuck_rev %>% 
   group_by(Type, year) %>% 
   summarise(mean = mean(count))
-# starbuck_rev %>% 
-#   ggplot() + 
-#   geom_col(mapping = aes(reorder(year, mean),
-#                          y = mean, fill=Type)) + labs(title = "Starbuck's Revenue")+
-#   theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Revenue")  +  facet_wrap(~Type, nrow = 3, scales = "free") + coord_flip()
+```
+
+```{r revenue_starbucks_2, message = FALSE, warning = FALSE}
+ starbuck_rev %>% 
+   ggplot() + 
+   geom_col(mapping = aes(reorder(year, mean),
+                          y = mean, fill=Type)) + labs(title = "Starbuck's Store Count(LS)")+
+   theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Count")  +  facet_wrap(~Type, nrow = 3, scales = "free")
+```
+
+
+## Starbucks Store Count
+```{r revenue_starbucks_4, message = FALSE, warning = FALSE}
 
 starbuck_rev %>%
-group_by(Type) %>%
-  ggplot(mapping = aes(x = year, y = mean)) +
-  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free") + labs(title = "Starbuck's Revenue")+ theme(plot.title = element_text(hjust = 0.5))
+  ggplot() +
+  geom_col(mapping = aes(reorder(year, mean),
+                         y = mean, fill=Type)) + labs(title = "Starbuck's Store Count(OS)")+
+  theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Count") + scale_fill_brewer(palette = "Set2")  +  facet_wrap(~Type, nrow = 3, scales = "free") 
 
-#revenue by country
+```
+
+At the visual inspection from 2015 we saw the CAP segment license dropping and comapany owned increasing. On further analysis we concluded that the business model of the Starbucks store is license where company creates company owned stores and then licenses in bulk. 2015 was the only time they happened in reverse and we could track this detail down.
+
+
+```{r revenue_dunkin, message = FALSE,  warning = FALSE}
+dunk_rev<- read_csv("data/dunkin.csv")
+
+dunk_rev <- dunk_rev %>% 
+  select(year_of_publish, DD_US_F:BR_US_C, Franchise_income, Rental_income:Total_reveneu)
+
+dunk_rev <- dunk_rev %>% 
+  rename(
+    `Dunkin US Franchise` = DD_US_F,
+    `Dunkin International Franchise` = DD_IN_F,
+    `Baskin Robin US Franchise` = BR_US_F,
+    `Baskin Robin International Franchise` = BR_IN_F,
+    `Baskin Robin US Company` = BR_US_C,
+    `Dunkin US Company` = DD_US_C
+  )
+```
+
+
+```{r revenue_dunkin_1, message = FALSE, warning = FALSE}
+dunk_rev <- dunk_rev %>% 
+  select(`Dunkin US Franchise`, `Dunkin International Franchise`, `Baskin Robin US Franchise`,  `Baskin Robin International Franchise`,`Baskin Robin US Company`,`Dunkin US Company`, year_of_publish) %>% 
+  gather(Type, count,`Dunkin US Franchise`, `Dunkin International Franchise` , `Baskin Robin US Franchise` ,`Baskin Robin International Franchise`,`Baskin Robin US Company`,`Dunkin US Company`) %>% 
+  na.omit()
+
+
+
+dunk_rev <- dunk_rev%>% 
+  group_by(Type, year_of_publish) %>% 
+  summarise(mean = mean(count))
+```
+
+
+## Dunkin Donuts Store Count
+```{r revenue_dunkin_9, message = FALSE, warning = FALSE}
+dunk_rev %>% 
+    ggplot() +
+    geom_col(mapping = aes(reorder(year_of_publish, mean),
+                           y = mean, fill=Type)) +
+    theme(plot.title = element_text(hjust = 0.5)) + ylab("Store Count") + xlab("Year")+ labs(title = "Dunkin Donut's Store Count")+ facet_wrap(~Type, scales = "free")
+```
+ 
+At the visual inspection of the Dunkin company stores went down to zero in 2017.
+Upon further inspection we figured out that the Dunkin model is franchise based and it changed to 100% franchise in 2016 dropping all it's ompany operated stores.
+
+```{r revenue_starbucks_3, message = FALSE, warning = FALSE}
 starbuck_rev<- read_csv("data/starbucks.csv")
 
 starbuck_rev <- starbuck_rev %>% 
@@ -525,19 +785,9 @@ starbuck_rev <- starbuck_rev %>%
 starbuck_rev <- starbuck_rev %>% 
   group_by(Type, year) %>% 
   summarise(mean = mean(count))
-# starbuck_rev %>% 
-#   ggplot() + 
-#   geom_col(mapping = aes(reorder(year, mean),
-#                          y = mean, fill=Type)) + labs(title = "Starbuck's Revenue/Country(LS)")+
-#   theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Revenue") + scale_fill_brewer(palette = "Set2")  +  facet_wrap(~Type, nrow = 3, scales = "free") + coord_flip()
-#   scale_y_continuous(limits = c(0, 20000))
+```
 
-starbuck_rev %>%
-  group_by(Type) %>%
-  ggplot(mapping = aes(x = year, y = mean)) +
-  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free")+ labs(title = "Starbuck's Revenue")+ labs(title = "Starbuck's Revenue/Country(LS)")+
-theme(plot.title = element_text(hjust = 0.5))
-
+```{r revenue_starbucks_5, message = FALSE, warning = FALSE}
 
 #revenue by country(com)
 
@@ -561,52 +811,29 @@ starbuck_rev <- starbuck_rev %>%
 #                          y = mean, fill=Type)) + labs(title = "Starbuck's Reveue/Country(OS)")+
 #   theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Revenue") + scale_fill_brewer(palette = "Set2")  +  facet_wrap(~Type, nrow = 3, scales = "free") + coord_flip()
 
-starbuck_rev %>%
-  group_by(Type) %>%
-  ggplot(mapping = aes(x = year, y = mean, )) +
-  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free") + labs(title = "Starbuck's Reveue/Country(OS)") + theme(plot.title = element_text(hjust = 0.5))
-
 ```
 
-```{r revenue_dunkin, message = FALSE, echo = FALSE, warning = FALSE}
-dunk_rev<- read_csv("data/dunkin.csv")
-
-dunk_rev <- dunk_rev %>% 
-  select(year_of_publish, DD_US_F:BR_US_C, Franchise_income, Rental_income:Total_reveneu)
-
-dunk_rev <- dunk_rev %>% 
-  rename(
-    `Dunkin US Franchise` = DD_US_F,
-    `Dunkin International Franchise` = DD_IN_F,
-    `Baskin Robin US Franchise` = BR_US_F,
-    `Baskin Robin International Franchise` = BR_IN_F,
-    `Baskin Robin US Company` = BR_US_C,
-    `Dunkin US Company` = DD_US_C
-  )
-dunk_rev <- dunk_rev %>% 
-  select(`Dunkin US Franchise`, `Dunkin International Franchise`, `Baskin Robin US Franchise`,  `Baskin Robin International Franchise`,`Baskin Robin US Company`,`Dunkin US Company`, year_of_publish) %>% 
-  gather(Type, count,`Dunkin US Franchise`, `Dunkin International Franchise` , `Baskin Robin US Franchise` ,`Baskin Robin International Franchise`,`Baskin Robin US Company`,`Dunkin US Company`) %>% 
-  na.omit()
+## Starbucks Revenue
+We found these patterns by analzing visually.
+By inspection, these resulted from analyzing all 10-K files data.
+```{r revenue_starbucks_6, message = FALSE, warning = FALSE}
+starbuck_rev %>%
+group_by(Type) %>%
+  ggplot(mapping = aes(x = year, y = mean)) +
+  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free") + labs(title = "Starbuck's Revenue")+ theme(plot.title = element_text(hjust = 0.5))
 
 
+```
+2014- Opens first Starbucks Reserve® Roastery and Tasting Room in Seattle.
+Launches Starbucks Mobile Order & Pay.
 
-dunk_rev <- dunk_rev%>% 
-  group_by(Type, year_of_publish) %>% 
-  summarise(mean = mean(count))
+2015- Evolution Fresh Stores and Teavana tea massive close-downs
 
-dunk_rev %>% 
-    ggplot() +
-    geom_col(mapping = aes(reorder(year_of_publish, mean),
-                           y = mean, fill=Type)) +
-    theme(plot.title = element_text(hjust = 0.5)) + ylab("Store Count") + xlab("Year")+ labs(title = "Dunkin Donut's Store Count")+ facet_wrap(~Type, scales = "free")
+2016- Siren Retail Group,Teavana tea dump,tazo tea,evolution fresh(germany switzerland bad euro rate)
 
-# dunk_rev %>%
-#   group_by(Type) %>% 
-#   ggplot(mapping = aes(x = year_of_publish, y = mean)) +
-#   geom_line(mapping = aes(color = Type)) + ylab("Store Count") + xlab("Year")+ facet_wrap(~Type, scales = "free")+ labs(title = "Dunkin Donut's Store Count")+ theme(plot.title = element_text(hjust = 0.5))
+2017- Purchased all of CAP segments. Opened many stores in Americas,emas, Food, consumer packaged goods production like coffee, Keurig cups was hurting so contract to nestle. Improved Starbucks siren(Reserve store)
 
-
-#----------------------------------------------------------------------------
+```{r revenue_dunkin_2, message = FALSE, warning = FALSE}
 dunk_rev<- read_csv("data/dunkin.csv")
 
 dunk_rev <- dunk_rev %>% 
@@ -631,10 +858,24 @@ dunk_rev <- dunk_rev %>%
 dunk_rev <- dunk_rev%>% 
   group_by(Type, year_of_publish) %>% 
   summarise(mean = mean(count))
+```
 
+
+## Dunkin Donuts Revenue
+```{r revenue_dunkin_3, message = FALSE, warning = FALSE}
 dunk_rev %>%
   group_by(Type) %>% 
   ggplot(mapping = aes(x = year_of_publish, y = mean)) +
   geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, scales = "free")+ theme(plot.title = element_text(hjust = 0.5))+ labs(title = "Dunkin Donut's Revenue")
 
 ```
+2014- Ice Cream cakes were launched and sold online with the order, and across all supermarkets. High ads were carried out. This leads to high sales for k cups and coffee also.
+
+2016- In this year they change to 100% 
+
+2018-Other related revenue increased by the addition of the gift card program
+
+But the main increase was due to  recognizing advertising revenue(5% of each store sales) separately from this balance sheet. The growth actually declined Other the real growth is 828027 
+
+
+

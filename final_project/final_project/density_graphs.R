@@ -31,16 +31,21 @@ library(socviz)
 # sq_mileage %>% write_csv("data/mileage.csv")
 
 sq_mileage <- read_csv("data/mileage.csv")
-DNKN_loc <- read_csv("data/DunkinAvgLocations#2.csv")
-SBUX_loc <- read_csv("data/StarbuckAvgLocations#2.csv") %>%
-  rename(n = count)
+DNKN_loc <- read_csv("data/DD-US.csv", col_names = FALSE)
+SBUX_loc <- read_csv("data/directory.csv")
 
-DNKN_loc <- DNKN_loc %>%
-  distinct(STATE, n) %>%
-  rename(state = STATE)
 SBUX_loc <- SBUX_loc %>%
-  distinct(STATE, n) %>%
-  rename(state = STATE)
+  filter(Country %in% c("US")) %>%
+  rename(state = `State/Province`) %>%
+  count(state)
+DNKN_loc <- DNKN_loc %>%
+  rename(specs = X3) %>%
+  separate(specs, c("specs", "state"), sep = ",")
+DNKN_loc <- DNKN_loc %>%
+  mutate(state = DNKN_loc %>%
+           pull(state) %>%
+           str_replace_all("// ", "")) %>%
+  count(state)
 
 DNKN_loc <- left_join(us_map(region = "states") %>%
                         rename(state = abbr), DNKN_loc, by = "state")
@@ -64,13 +69,17 @@ DNKN_loc %>%
   geom_polygon() +
   coord_equal() +
   theme_map() +
-  scale_fill_distiller(palette = "Set1")
+  scale_fill_distiller(palette = "Set1") +
+  labs(title = "Dunkin' Locations") +
+  theme(plot.title = element_text(hjust = 0.5))
 SBUX_loc %>%
   ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
   geom_polygon() +
   coord_equal() +
   theme_map() +
-  scale_fill_distiller(palette = "Set1")
+  scale_fill_distiller(palette = "Set1") +
+  labs(title = "Starbucks Locations") +
+  theme(plot.title = element_text(hjust = 0.5))
 
 DNKN_loc <- DNKN_loc %>%
   filter(state %nin% c("DC"))
@@ -82,11 +91,15 @@ DNKN_loc %>%
   geom_polygon() +
   coord_equal() +
   theme_map() +
-  scale_fill_distiller(palette = "Set1")
+  scale_fill_distiller(palette = "Set1") +
+  labs(title = "Dunkin' Locations") +
+  theme(plot.title = element_text(hjust = 0.5))
 SBUX_loc %>%
   ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
   geom_polygon() +
   coord_equal() +
   theme_map() +
-  scale_fill_distiller(palette = "Set1")
+  scale_fill_distiller(palette = "Set1") +
+  labs(title = "Starbucks Locations") +
+  theme(plot.title = element_text(hjust = 0.5))
 
