@@ -515,8 +515,6 @@ SBUX_loc %>%
   top_n(5)
 ```
 
-
-
 # Subquestion: How many Dunkin Donuts are in Mississippi?
 
 ```{r mississippi_dunkin,message=FALSE}
@@ -541,6 +539,19 @@ data<-left_join(df,zip,by="ZIP") %>%
   filter(STATE=="MS") %>% 
   group_by(county) %>% 
   count()
+
+df <- df %>%
+  mutate(ZIP = as.numeric(sapply(strsplit(df$DATA, split=c(' '), fixed=TRUE), function(x) (x[2])))) 
+
+data<-left_join(df,zip,by="ZIP") %>% 
+  # mutate(COUNTYNAME=str_remove(COUNTYNAME," County")) %>% 
+  rename(county=COUNTYNAME) %>% 
+  # mutate(county=tolower(county)) %>% 
+  filter(STATE=="MS") %>% 
+  group_by(county) %>% 
+  count()
+
+
 left_join(county_map,data,by="county") %>% 
  ggplot() +
   geom_polygon(mapping = aes(x=x,y=y,group=group,fill=n),color = "lightgray", size = 0.5) +
@@ -548,6 +559,7 @@ left_join(county_map,data,by="county") %>%
   theme_map()+
   theme(panel.background = element_blank()) + ggtitle("Mississippi Dunkin' Donut's Location", subtitle = "Average # of Stores") + labs(fill = "Average") + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5),plot.subtitle =  element_text(hjust = 0.5))+
   scale_fill_gradient(low = "orange", high = "purple", guide = guide_legend())
+
 ```
 
 ## Solution: The most competition between Dunkin' and Starbucks is located primarily in the North and on the East Coast.  The least competition is in the north-west where Dunkin' does not have any stores.
