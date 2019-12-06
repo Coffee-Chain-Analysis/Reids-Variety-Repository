@@ -679,12 +679,9 @@ yrly %>%
 
 
 
-
-
-
-
-
 # Question 3: What are some patterns that show in the revenue data of either Dunkin' or Starbucks?
+
+# Starbuck's Store Count Analysis
 ```{r revenue_starbucks, message = FALSE, warning = FALSE}
 #Revenue of company stores
 starbuck_rev<- read_csv("data/starbucks.csv")
@@ -693,9 +690,14 @@ starbuck_rev <- starbuck_rev %>%
   select(year, Company_Operated_Stores:Total_OS)
 
 starbuck_rev <- starbuck_rev %>% 
-  select(Company_Operated_Stores, License_Stores, Other, Total,year) %>% 
-  gather(Type, count, Company_Operated_Stores, License_Stores, Other, Total) %>% 
+  rename(`Company Operated Stores`= Company_Operated_Stores, `Licensd Stores` = License_Stores, `Total-Overall` = Total)
+
+starbuck_rev <- starbuck_rev %>% 
+  select(`Company Operated Stores`, `Licensd Stores` , Other, `Total-Overall` ,year) %>% 
+  gather(Type, count, `Company Operated Stores`, `Licensd Stores`, Other, `Total-Overall`) %>% 
   na.omit()
+
+
 
 starbuck_rev <- starbuck_rev %>% 
   group_by(Type, year) %>% 
@@ -706,21 +708,10 @@ starbuck_rev <- starbuck_rev %>%
  starbuck_rev %>% 
    ggplot() + 
    geom_col(mapping = aes(reorder(year, mean),
-                          y = mean, fill=Type)) + labs(title = "Starbuck's Store Count(LS)")+
+                          y = mean, fill=Type)) + labs(title = "Starbuck's Store Count")+
    theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Count")  +  facet_wrap(~Type, nrow = 3, scales = "free")
 ```
 
-
-# Starbucks Store Count Analysis 
-```{r revenue_starbucks_4, message = FALSE, warning = FALSE}
-
-starbuck_rev %>%
-  ggplot() +
-  geom_col(mapping = aes(reorder(year, mean),
-                         y = mean, fill=Type)) + labs(title = "Starbuck's Store Count(OS)")+
-  theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Count") + scale_fill_brewer(palette = "Set2")  +  facet_wrap(~Type, nrow = 3, scales = "free") 
-
-```
 
 ## Analysis: At the visual inspection from 2015 we saw the CAP segment license dropping and comapany owned increasing. On further analysis we concluded that the business model of the Starbucks store is license where company creates company owned stores and then licenses in bulk. 2015 was the only time they happened in reverse and we could track this detail down.
 
@@ -775,14 +766,36 @@ starbuck_rev <- starbuck_rev %>%
   select(year, Company_Operated_Stores:Total_OS)
 
 starbuck_rev <- starbuck_rev %>% 
-  select(Americas_Licensed, EMEA_Licensed, CP_Licensed, Total_LS, year) %>% 
-  gather(Type, count, Americas_Licensed, EMEA_Licensed, CP_Licensed, Total_LS) %>% 
+rename(`Americas` = Americas_Licensed,
+       `Europe/Middle-East Asia` = EMEA_Licensed,
+       `China/Asia Pacific` = CP_Licensed,
+       `Total-Licensed` = Total_LS)
+
+starbuck_rev <- starbuck_rev %>% 
+  select(`Americas`, `Europe/Middle-East Asia`, `China/Asia Pacific`, Total, year) %>% 
+  gather(Type, count, Americas, `Europe/Middle-East Asia` ,`China/Asia Pacific` , Total) %>% 
   na.omit()
+
+
+
+
 
 starbuck_rev <- starbuck_rev %>% 
   group_by(Type, year) %>% 
   summarise(mean = mean(count))
 ```
+
+
+# Starbucks Revenue Analysis (Licensed)
+```{r revenue_starbucks_12, message = FALSE, warning = FALSE}
+starbuck_rev %>%
+group_by(Type) %>%
+  ggplot(mapping = aes(x = year, y = mean)) +
+  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free") + labs(title = "Starbuck's Revenue(LS)")+ theme(plot.title = element_text(hjust = 0.5))
+
+
+```
+
 
 ```{r revenue_starbucks_5, message = FALSE, warning = FALSE}
 
@@ -794,9 +807,17 @@ starbuck_rev <- starbuck_rev %>%
   select(year, Company_Operated_Stores:Total_OS)
 
 starbuck_rev <- starbuck_rev %>% 
-  select(Americas_Com, EMEA_Com, CP_Com, Total_OS, year) %>% 
-  gather(Type, count, Americas_Com, EMEA_Com, CP_Com, Total_OS) %>% 
+rename(`Americas` = Americas_Com,
+       `Europe/Middle-East Asia` = EMEA_Com,
+       `China/Asia Pacific` = CP_Com,
+       `Total-Operated Stores` = Total_OS)
+
+starbuck_rev <- starbuck_rev %>% 
+  select(Americas, `Europe/Middle-East Asia`, `China/Asia Pacific`, Total, year) %>% 
+  gather(Type, count, Americas, `Europe/Middle-East Asia` ,`China/Asia Pacific` , Total) %>% 
   na.omit()
+
+
 
 starbuck_rev <- starbuck_rev %>% 
   group_by(Type, year) %>% 
@@ -810,14 +831,14 @@ starbuck_rev <- starbuck_rev %>%
 
 ```
 
-# Starbucks Revenue Analysis 
+# Starbucks Revenue Analysis (Operated Stores)
 
 ## Analysis: We found these patterns by analzing visually. By inspection, these resulted from analyzing all 10-K files data.
 ```{r revenue_starbucks_6, message = FALSE, warning = FALSE}
 starbuck_rev %>%
 group_by(Type) %>%
   ggplot(mapping = aes(x = year, y = mean)) +
-  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free") + labs(title = "Starbuck's Revenue")+ theme(plot.title = element_text(hjust = 0.5))
+  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free") + labs(title = "Starbuck's Revenue(OS)")+ theme(plot.title = element_text(hjust = 0.5))
 
 
 ```
@@ -878,7 +899,6 @@ dunk_rev %>%
 
 ## - 2018-Other related revenue increased by the addition of the gift card program
 
-## Solution: Overall, the main increase was due to  recognizing advertising revenue(5% of each store sales) separately from this balance sheet. The growth actually declined Other the real growth is 828027 
+## Analysis: Overall, the main increase was due to  recognizing advertising revenue(5% of each store sales) separately from this balance sheet. The growth actually declined Other the real growth is 828027 
 
-
-
+## Solution: Based on our analysis,   Starbucks shows higher revenue and showcases stronger adaptive policies for sustained growth.
