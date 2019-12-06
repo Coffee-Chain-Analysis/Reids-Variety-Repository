@@ -837,6 +837,30 @@ group_by(Type) %>%
 
 ```
 
+# Starbuck's Total Revenue Analysis
+```{r revenue_starbucks_19, message = FALSE, warning = FALSE}
+starbuck_rev<- read_csv("data/starbucks.csv")
+
+starbuck_rev <- starbuck_rev %>% 
+  select(year, Company_Operated_Stores:Total_OS)
+
+starbuck_rev <- starbuck_rev %>% 
+  rename(`Company Operated Stores` = Company_Operated_Stores, `Licensed Stores` = License_Stores)
+
+starbuck_rev <- starbuck_rev %>% 
+  select(`Company Operated Stores`, `Licensed Stores`, Other, Total,year) %>% 
+  gather(Type, count, `Company Operated Stores`, `Licensed Stores`, Other, Total) %>% 
+  na.omit()
+
+starbuck_rev <- starbuck_rev %>% 
+  group_by(Type, year) %>% 
+  summarise(mean = mean(count))
+
+starbuck_rev %>%
+group_by(Type) %>%
+  ggplot(mapping = aes(x = year, y = mean)) +
+  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free") + labs(title = "Starbuck's Revenue")+ theme(plot.title = element_text(hjust = 0.5))
+```
 
 ## - 2014 - Opens first Starbucks Reserve® Roastery and Tasting Room in Seattle.
 
@@ -876,30 +900,7 @@ dunk_rev <- dunk_rev%>%
 ```
 
 
-# Starbuck's Total Revenue Analysis
-```{r revenue_starbucks_19, message = FALSE, warning = FALSE}
-starbuck_rev<- read_csv("data/starbucks.csv")
 
-starbuck_rev <- starbuck_rev %>% 
-  select(year, Company_Operated_Stores:Total_OS)
-
-starbuck_rev <- starbuck_rev %>% 
-  rename(`Company Operated Stores` = Company_Operated_Stores, `Licensed Stores` = License_Stores)
-
-starbuck_rev <- starbuck_rev %>% 
-  select(`Company Operated Stores`, `Licensed Stores`, Other, Total,year) %>% 
-  gather(Type, count, `Company Operated Stores`, `Licensed Stores`, Other, Total) %>% 
-  na.omit()
-
-starbuck_rev <- starbuck_rev %>% 
-  group_by(Type, year) %>% 
-  summarise(mean = mean(count))
-
-starbuck_rev %>%
-group_by(Type) %>%
-  ggplot(mapping = aes(x = year, y = mean)) +
-  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free") + labs(title = "Starbuck's Revenue")+ theme(plot.title = element_text(hjust = 0.5))
-```
 
 # Dunkin Donuts Revenue Analysis 
 ```{r revenue_dunkin_3, message = FALSE, warning = FALSE}
