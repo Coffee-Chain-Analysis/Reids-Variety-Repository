@@ -759,6 +759,8 @@ dunk_rev %>%
  
 ## Analysis: At the visual inspection of the Dunkin company stores went down to zero in 2017. Upon further inspection we figured out that the Dunkin model is franchise based and it changed to 100% franchise in 2016 dropping all it's ompany operated stores.
 
+
+
 ```{r revenue_starbucks_3, message = FALSE, warning = FALSE}
 starbuck_rev<- read_csv("data/starbucks.csv")
 
@@ -772,8 +774,8 @@ rename(`Americas` = Americas_Licensed,
        `Total-Licensed` = Total_LS)
 
 starbuck_rev <- starbuck_rev %>% 
-  select(`Americas`, `Europe/Middle-East Asia`, `China/Asia Pacific`, Total, year) %>% 
-  gather(Type, count, Americas, `Europe/Middle-East Asia` ,`China/Asia Pacific` , Total) %>% 
+  select(`Americas`, `Europe/Middle-East Asia`, `China/Asia Pacific`, `Total-Licensed`, year) %>% 
+  gather(Type, count, Americas, `Europe/Middle-East Asia` ,`China/Asia Pacific` , `Total-Licensed`) %>% 
   na.omit()
 
 
@@ -784,7 +786,6 @@ starbuck_rev <- starbuck_rev %>%
   group_by(Type, year) %>% 
   summarise(mean = mean(count))
 ```
-
 
 # Starbucks Revenue Analysis (Licensed)
 ```{r revenue_starbucks_12, message = FALSE, warning = FALSE}
@@ -822,13 +823,6 @@ starbuck_rev <- starbuck_rev %>%
 starbuck_rev <- starbuck_rev %>% 
   group_by(Type, year) %>% 
   summarise(mean = mean(count))
-
-# starbuck_rev %>% 
-#   ggplot() + 
-#   geom_col(mapping = aes(reorder(year, mean),
-#                          y = mean, fill=Type)) + labs(title = "Starbuck's Reveue/Country(OS)")+
-#   theme(plot.title = element_text(hjust = 0.5)) + xlab("Year") + ylab("Revenue") + scale_fill_brewer(palette = "Set2")  +  facet_wrap(~Type, nrow = 3, scales = "free") + coord_flip()
-
 ```
 
 # Starbucks Revenue Analysis (Operated Stores)
@@ -881,6 +875,31 @@ dunk_rev <- dunk_rev%>%
   summarise(mean = mean(count))
 ```
 
+
+# Starbuck's Total Revenue Analysis
+```{r revenue_starbucks_19, message = FALSE, warning = FALSE}
+starbuck_rev<- read_csv("data/starbucks.csv")
+
+starbuck_rev <- starbuck_rev %>% 
+  select(year, Company_Operated_Stores:Total_OS)
+
+starbuck_rev <- starbuck_rev %>% 
+  rename(`Company Operated Stores` = Company_Operated_Stores, `Licensed Stores` = License_Stores)
+
+starbuck_rev <- starbuck_rev %>% 
+  select(`Company Operated Stores`, `Licensed Stores`, Other, Total,year) %>% 
+  gather(Type, count, `Company Operated Stores`, `Licensed Stores`, Other, Total) %>% 
+  na.omit()
+
+starbuck_rev <- starbuck_rev %>% 
+  group_by(Type, year) %>% 
+  summarise(mean = mean(count))
+
+starbuck_rev %>%
+group_by(Type) %>%
+  ggplot(mapping = aes(x = year, y = mean)) +
+  geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, nrow = 3,scales = "free") + labs(title = "Starbuck's Revenue")+ theme(plot.title = element_text(hjust = 0.5))
+```
 
 # Dunkin Donuts Revenue Analysis 
 ```{r revenue_dunkin_3, message = FALSE, warning = FALSE}
