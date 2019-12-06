@@ -3,30 +3,26 @@ title: "Group 4 Writeup"
 author: "Reid Jumper, Harsh Nagarkar, and Micheal Davis"
 date: "12/4/2019"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
-  pdf_document: default
 ---
-## Analysis of Public Coffee Chains
+# Analysis of Public Coffee Chains
 
-WHO SHOULD YOU INVEST INTO?
+## WHO SHOULD YOU INVEST INTO?
 
-Company Description
+### Company Description
 
-Quick service  restaurant
+### Quick service restaurant
 
-Starbucks Corporation (formed in 1985) - Seattle Washington  - 17 countries. 
-selling coffee, tea and deli items.
+### Starbucks Corporation (formed in 1985) - Seattle Washington  - 17 countries. selling coffee, tea and deli items.
 
-DUNKIN’ BRANDS GROUP, INC. (formed in 1980) entered in  market 2002 
-Made of 
- Dunkin Donuts (Donuts Breakfast)
- Baskins and Robins (Icecreams,cakes)
+### DUNKIN’ BRANDS GROUP, INC. (formed in 1980) entered in market 2002. Made of Dunkin Donuts (Donuts Breakfast) Baskins and Robins (Icecreams,cakes)
 
-In order to compare these companies strength and fruitfulness we choose to investigate using 3 categories
-1. US store competition analysis
-2. Stock growth analysis
-3. Sec sales and stores analysis
+### In order to compare these companies strength and fruitfulness we choose to investigate using 3 categories
+### 1. US store competition analysis
+### 2. Stock growth analysis 
+### 3. Sec sales and stores analysis
 
 
 ```{r setup}
@@ -48,7 +44,10 @@ library(zoo)
 #webshot::install_phantomjs
 
 ```
-## Where are the companies, Dunkin' Donuts and Starbucks, competing?
+
+# Question 1: Where are the companies, Dunkin' Donuts and Starbucks, competing?
+
+## Note: First, it is important to look at where these restaurants are located in the US.
 ```{r locations, message=FALSE}
 sbuxloc <- read_csv("data/sbuxlocations.csv")
 dnknloc <- read_csv("data/dnknlocations.csv", col_names = FALSE)
@@ -82,8 +81,8 @@ sbuxLabel <- sprintf("<b>Starbucks</b><br>%s", sbuxloc$`State/Province`) %>%
   lapply(htmltools::HTML)
 ```
 
-First, it is important to look at where these restaurants are located in the US.
-# Dunkin' Leaflet
+
+# Dunkin' Leaflet Graph
 ```{r leaflet_maps_dnkn, message = FALSE}
 dnknloc %>%
   leaflet(width = "100%", options = leafletOptions(zoomSnap = 0.1)) %>%
@@ -95,7 +94,7 @@ dnknloc %>%
 
 
 
-# Starbucks Leaflet
+# Starbucks Leaflet Graph
 ```{r leaflet_maps_sbux, message = FALSE}
 sbuxloc %>%
   leaflet(width = "100%", options = leafletOptions(zoomSnap = 0.1)) %>%
@@ -103,6 +102,8 @@ sbuxloc %>%
   addTiles() %>%
   addMarkers(~Longitude, ~Latitude, popup = sbuxLabel, label = sbuxLabel)
 ```
+
+
 
 ```{r dnkn_sbux,  message = FALSE}
 dnkn_sbux <- tibble(
@@ -177,7 +178,7 @@ modified_values <- scale_coord(dnkn_sbux$state, dnkn_sbux$longitude, dnkn_sbux$l
 
 
 
-
+# Subquestion: Which states have the highest number of stores for Dunkin Donuts and Starbucks?
 
 # Locations Graphs
 ```{r graph_locations, message = FALSE}
@@ -197,12 +198,6 @@ ggplot() +
 
 
 
-
-
-
-
-
-## Which states have the highest number of stores for Dunkin Donuts and Starbucks?
 ```{r store_per_state_starbucks, message = FALSE} 
 #gather data from csv files
 starbuck_local<- read_csv("data/directory.csv")
@@ -257,7 +252,7 @@ coord <- us_states %>%
 ```
 
 
-
+# Starbuck's Location Analysis with Top 5
 ```{r store_per_state_starbucks_5, message = FALSE}
 new_data <- merge(temp_data, coord, by = "STATE" )
 
@@ -334,7 +329,7 @@ new_data <- merge(temp_data, coord, by = "STATE" )
 final_data <- merge(new_data, us_states, by = "STATE" )
 ```
 
-
+# Dunkin's Location Analysis with Top 5
 ```{r store_per_state_starbucks_6, message = FALSE}
 #plot data for locations
 centroid <- aggregate(data=final_data, cbind(x_avg, y_avg) ~ n + group, FUN=mean) 
@@ -349,7 +344,7 @@ data%>%
 
 data %>%
   arrange(desc(n)) %>%
-  distinct(STATE, count) %>% 
+  distinct(STATE, n) %>% 
   head(5)
 ```
 
@@ -448,12 +443,13 @@ SBUX_loc <- SBUX_loc %>%
 
 
 
+# Subquestion: What states have the highest densities of Dunkin' and Starbucks?
+## Analysis: When Washington D.C. is included in the density plots, we noticed that the data is heavily skewed, so in order to get a proper look at the densities of these companies, Washington D.C. must be filtered out.
 
 
+## Density Level Graphs
 
-
-## What states have the highest densities of Dunkin' and Starbucks?
-When Washington D.C. is included in the density plots, we noticed that the data is heavily skewed, so in order to get a proper look at the densities of these companies, Washington D.C. must be filtered out.
+# Dunkin's Density Location
 ```{r DC_graphs, message = FALSE}
 DNKN_loc %>%
   ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
@@ -463,6 +459,10 @@ DNKN_loc %>%
   scale_fill_distiller(palette = "Set1") +
   labs(title = "Dunkin' Locations") +
   theme(plot.title = element_text(hjust = 0.5))
+```
+
+# Starbuck's Density Location
+```{r DC_graphs_2, message = FALSE}
 SBUX_loc %>%
   ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
   geom_polygon() +
@@ -480,6 +480,7 @@ SBUX_loc <- SBUX_loc %>%
   filter(state %nin% c("DC"))
 ```
 
+# Dunkin's Density Location Excluding DC(w/ Top 5)
 ```{r dens_graphs, message = FALSE}
 DNKN_loc %>%
   ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
@@ -489,6 +490,16 @@ DNKN_loc %>%
   scale_fill_distiller(palette = "Set1") +
   labs(title = "Dunkin' Locations") +
   theme(plot.title = element_text(hjust = 0.5))
+
+DNKN_loc %>%
+  distinct(state, density) %>%
+  arrange(desc(density)) %>%
+  top_n(5)
+```
+
+
+# Starbuck's Density Location Excluding DC(w/ Top 5)
+```{r dens_graphs_3, message = FALSE}
 SBUX_loc %>%
   ggplot(mapping = aes(x = x, y = y, group = group, fill = density)) +
   geom_polygon() +
@@ -497,27 +508,53 @@ SBUX_loc %>%
   scale_fill_distiller(palette = "Set1") +
   labs(title = "Starbucks Locations") +
   theme(plot.title = element_text(hjust = 0.5))
-DNKN_loc %>%
-  distinct(state, density) %>%
-  arrange(desc(density)) %>%
-  top_n(5)
+
 SBUX_loc %>%
   distinct(state, density) %>%
   arrange(desc(density)) %>%
   top_n(5)
 ```
-The most competition between Dunkin' and Starbucks is located primarily in the North and on the East Coast.  The least competition is in the north-west where Dunkin' does not have any stores.
 
 
 
+# Subquestion: How many Dunkin Donuts are in Mississippi?
 
+```{r mississippi_dunkin,message=FALSE}
 
+df<- read_csv("data/DD-US.csv",col_names = FALSE)
+zip<-read_csv("data/ZIP-COUNTY-FIPS-2018.csv")
+county_map <- us_map("county") %>% 
+  filter(full=="Mississippi")
+zip<-zip %>% 
+  mutate(ZIP=as.numeric(ZIP))
+  
+df <- df %>%
+  mutate(ZIP = sapply(strsplit(df$X4, split='|', fixed=TRUE), function(x) (x[2]))) 
+df <- df %>%
+  mutate(DATA = sapply(strsplit(df$ZIP, split=c(','), fixed=TRUE), function(x) (x[2]))) 
+df <- df %>%
+  mutate(ZIP = as.numeric(sapply(strsplit(df$DATA, split=c(' '), fixed=TRUE), function(x) (x[2])))) 
+data<-left_join(df,zip,by="ZIP") %>% 
+  # mutate(COUNTYNAME=str_remove(COUNTYNAME," County")) %>% 
+  rename(county=COUNTYNAME) %>% 
+  # mutate(county=tolower(county)) %>% 
+  filter(STATE=="MS") %>% 
+  group_by(county) %>% 
+  count()
+left_join(county_map,data,by="county") %>% 
+ ggplot() +
+  geom_polygon(mapping = aes(x=x,y=y,group=group,fill=n),color = "lightgray", size = 0.5) +
+  coord_equal()+
+  theme_map()+
+  theme(panel.background = element_blank()) + ggtitle("Mississippi Dunkin' Donut's Location", subtitle = "Average # of Stores") + labs(fill = "Average") + theme(legend.position="bottom", plot.title = element_text(hjust = 0.5),plot.subtitle =  element_text(hjust = 0.5))+
+  scale_fill_gradient(low = "orange", high = "purple", guide = guide_legend())
+```
 
+## Solution: The most competition between Dunkin' and Starbucks is located primarily in the North and on the East Coast.  The least competition is in the north-west where Dunkin' does not have any stores.
 
+# Qustion 2: Do the stocks of Starbucks and Dunkin' Donuts comply with the Warren Buffet Rule?
 
-###Do the stocks of Starbucks and Dunkin' Donuts comply with the Warren Buffet Rule?
-
-Warren claimed that over the period of time the average yearly yeild of a company is in 6-7%.
+## Analysis: Warren claimed that over the period of time the average yearly yeild of a company is in 6-7%.
 ```{r stock, message = FALSE}
 
 DNKN <- read_csv("data/modified_DNKN.csv")
@@ -549,7 +586,7 @@ D_S <- tibble(
 
 
 
-# Monthly Stock Close
+# Monthly Stock Close Analysis 
 ```{r monthly_stock, message = FALSE}
 D_S %>%
   group_by(stock) %>%
@@ -567,7 +604,7 @@ D_S %>%
 
 
 
-#Prediction Values
+# Prediction Values for Stock Analysis
 
 ```{r percent_error, message = FALSE}
 Starbucks_intercepts<-lm(SBUX$close~SBUX$timestamp)[1]$coefficient
@@ -582,14 +619,16 @@ Starbucks_average_growth_rate<-(tail(SBUX,1)$close-head(SBUX,1)$close)/tail(SBUX
 Dunkin_average_growth_rate<-(tail(DNKN,1)$close-head(DNKN,1)$close)/tail(DNKN,1)$close*100/7
 
 ```
-Yearly Growth rate for Starbucks and Dunkin respectively
+
+# Yearly Growth rate for Starbucks and Dunkin respectively
 ```{r year_values_1,message=FALSE}
 Starbucks_average_growth_rate
 Dunkin_average_growth_rate
 ```
-Dunkin exceed a bit where as starbucks is almost in range. Starbuck stock yeild is coming down because of the stock split happening in 2015.
 
-What would the monthly growth rate be for Starbucks and Dunkin be?
+## Solution: Dunkin exceed a bit where as starbucks is almost in range. Starbuck stock yeild is coming down due to the stock split happening in 2015.
+
+# Subquestion: What would the monthly growth rate be for Starbucks and Dunkin be?
 ```{r year_values_2,message=FALSE}
 Starbucks_monthly_average_growth_rate
 Dunkin_monthly_average_growth_rate
@@ -611,7 +650,7 @@ yrly <- D_S %>%
 
 
 
-# Yearly Mean Stock Close
+# Yearly Mean Stock Close Analysis 
 ```{r yearly_mean, message = FALSE}
 yrly %>%
   group_by(stock) %>%
@@ -633,7 +672,7 @@ yrly %>%
 
 
 
-## What are some patterns that show in the data of either Dunkin' or Starbucks?
+# Question 3: What are some patterns that show in the revenue data of either Dunkin' or Starbucks?
 ```{r revenue_starbucks, message = FALSE, warning = FALSE}
 #Revenue of company stores
 starbuck_rev<- read_csv("data/starbucks.csv")
@@ -660,7 +699,7 @@ starbuck_rev <- starbuck_rev %>%
 ```
 
 
-## Starbucks Store Count
+# Starbucks Store Count Analysis 
 ```{r revenue_starbucks_4, message = FALSE, warning = FALSE}
 
 starbuck_rev %>%
@@ -671,7 +710,7 @@ starbuck_rev %>%
 
 ```
 
-At the visual inspection from 2015 we saw the CAP segment license dropping and comapany owned increasing. On further analysis we concluded that the business model of the Starbucks store is license where company creates company owned stores and then licenses in bulk. 2015 was the only time they happened in reverse and we could track this detail down.
+## Analysis: At the visual inspection from 2015 we saw the CAP segment license dropping and comapany owned increasing. On further analysis we concluded that the business model of the Starbucks store is license where company creates company owned stores and then licenses in bulk. 2015 was the only time they happened in reverse and we could track this detail down.
 
 
 ```{r revenue_dunkin, message = FALSE,  warning = FALSE}
@@ -706,7 +745,7 @@ dunk_rev <- dunk_rev%>%
 ```
 
 
-## Dunkin Donuts Store Count
+# Dunkin Donuts Store Count Analysis
 ```{r revenue_dunkin_9, message = FALSE, warning = FALSE}
 dunk_rev %>% 
     ggplot() +
@@ -715,8 +754,7 @@ dunk_rev %>%
     theme(plot.title = element_text(hjust = 0.5)) + ylab("Store Count") + xlab("Year")+ labs(title = "Dunkin Donut's Store Count")+ facet_wrap(~Type, scales = "free")
 ```
  
-At the visual inspection of the Dunkin company stores went down to zero in 2017.
-Upon further inspection we figured out that the Dunkin model is franchise based and it changed to 100% franchise in 2016 dropping all it's ompany operated stores.
+## Analysis: At the visual inspection of the Dunkin company stores went down to zero in 2017. Upon further inspection we figured out that the Dunkin model is franchise based and it changed to 100% franchise in 2016 dropping all it's ompany operated stores.
 
 ```{r revenue_starbucks_3, message = FALSE, warning = FALSE}
 starbuck_rev<- read_csv("data/starbucks.csv")
@@ -760,9 +798,9 @@ starbuck_rev <- starbuck_rev %>%
 
 ```
 
-## Starbucks Revenue
-We found these patterns by analzing visually.
-By inspection, these resulted from analyzing all 10-K files data.
+# Starbucks Revenue Analysis 
+
+## Analysis: We found these patterns by analzing visually. By inspection, these resulted from analyzing all 10-K files data.
 ```{r revenue_starbucks_6, message = FALSE, warning = FALSE}
 starbuck_rev %>%
 group_by(Type) %>%
@@ -771,14 +809,17 @@ group_by(Type) %>%
 
 
 ```
-2014- Opens first Starbucks Reserve® Roastery and Tasting Room in Seattle.
-Launches Starbucks Mobile Order & Pay.
 
-2015- Evolution Fresh Stores and Teavana tea massive close-downs
 
-2016- Siren Retail Group,Teavana tea dump,tazo tea,evolution fresh(germany switzerland bad euro rate)
+## - 2014 - Opens first Starbucks Reserve® Roastery and Tasting Room in Seattle.
 
-2017- Purchased all of CAP segments. Opened many stores in Americas,emas, Food, consumer packaged goods production like coffee, Keurig cups was hurting so contract to nestle. Improved Starbucks siren(Reserve store)
+## - Launches Starbucks Mobile Order & Pay.
+
+## - 2015 - Evolution Fresh Stores and Teavana tea massive close-downs
+
+## - 2016- Siren Retail Group,Teavana tea dump,tazo tea,evolution fresh(germany switzerland bad euro rate)
+
+## - 2017- Purchased all of CAP segments. Opened many stores in Americas,emas, Food, consumer packaged goods production like coffee, Keurig cups was hurting so contract to nestle. Improved Starbucks siren(Reserve store)
 
 ```{r revenue_dunkin_2, message = FALSE, warning = FALSE}
 dunk_rev<- read_csv("data/dunkin.csv")
@@ -808,7 +849,7 @@ dunk_rev <- dunk_rev%>%
 ```
 
 
-## Dunkin Donuts Revenue
+# Dunkin Donuts Revenue Analysis 
 ```{r revenue_dunkin_3, message = FALSE, warning = FALSE}
 dunk_rev %>%
   group_by(Type) %>% 
@@ -816,13 +857,16 @@ dunk_rev %>%
   geom_line(mapping = aes(color = Type)) + ylab("Revenue") + xlab("Year")+ facet_wrap(~Type, scales = "free")+ theme(plot.title = element_text(hjust = 0.5))+ labs(title = "Dunkin Donut's Revenue")
 
 ```
-2014- Ice Cream cakes were launched and sold online with the order, and across all supermarkets. High ads were carried out. This leads to high sales for k cups and coffee also.
 
-2016- In this year they change to 100% 
 
-2018-Other related revenue increased by the addition of the gift card program
 
-But the main increase was due to  recognizing advertising revenue(5% of each store sales) separately from this balance sheet. The growth actually declined Other the real growth is 828027 
+## - 2014- Ice Cream cakes were launched and sold online with the order, and across all supermarkets. High ads were carried out. This leads to high sales for k cups and coffee also.
+
+## - 2016- In this year they change to 100% 
+
+## - 2018-Other related revenue increased by the addition of the gift card program
+
+## Solution: Overall, the main increase was due to  recognizing advertising revenue(5% of each store sales) separately from this balance sheet. The growth actually declined Other the real growth is 828027 
 
 
 
